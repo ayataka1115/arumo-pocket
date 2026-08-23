@@ -355,7 +355,10 @@ function knownHouse(house) {
       if (String(col[i][0]) === house) { found = true; break; }
     }
   }
-  cache.put(ck, found ? '1' : '0', 300);
+  /* 「ある」は5分、「ない」は30秒しか覚えない。
+   * 家族コードを変えた直後は、同期が済むまで一瞬「ない」になる。
+   * そこを5分も覚えていると、写真の読み取りとレシピが理由もわからず使えなくなる。 */
+  cache.put(ck, found ? '1' : '0', found ? 300 : 30);
   return found;
 }
 

@@ -882,7 +882,11 @@ $('#set-body').addEventListener('click', e => {
     for (let i = 0; i < 14; i++) code += abc[Math.floor(Math.random() * abc.length)];
     setShare({ house: code });
     renderSettings();
-    toast('家族コードを作りました。家族にも同じものを入れてもらってください');
+    /* すぐ同期して、サーバー側に「この家は実在する」と覚えさせる。
+     * これをやらないと、写真の読み取りとレシピが「使えません」で弾かれる
+     * （実績のある家だけ通す作りにしてあるため）。 */
+    sync().catch(() => {});
+    toast('新しい家族コードにしました。「招待リンクを送る」で家族に配ってください');
     return;
   }
   if (b.id === 's-sync-now') {
