@@ -95,6 +95,27 @@ node /private/tmp/claude-501/-Users-macbook-Desktop-Claude-Code/7507196f-f975-4d
 5. `/exec` の URL をアプリの **設定 > 共有** に貼り、「新しく作る」で家族コードを作る
 6. 家族の端末にも同じ URL と家族コードを入れる
 
+#### 2回目からの貼り替え
+
+```bash
+bash tools/deploy-gas.sh
+```
+
+検証台を通してから `gas/` を送り、**いまのデプロイを新しいバージョンにする**。
+最後に `tools/check-gas.sh` が走って、新しい中身で動いているかまで見る。
+
+「新しいデプロイ」は作らない。作ると `/exec` の URL が変わり、
+家族全員の「設定 > 共有」が一斉に切れる。
+
+はじめの1回だけ、ログインと `.clasp.json` が要る（スクリプトが手順を出す）。
+どちらもコミットしない（`.gitignore` 済み）。
+
+貼り替えが効いているかだけ見たいときは：
+
+```bash
+bash tools/check-gas.sh        # Gemini はほとんど使わない
+```
+
 写真の読み取り（E）とレシピ（G）も、この URL 経由で Gemini に取り次ぐ。
 **API キーは端末に置かない。**
 
@@ -125,6 +146,7 @@ node /private/tmp/claude-501/-Users-macbook-Desktop-Claude-Code/7507196f-f975-4d
 ```bash
 node tools/gas-harness.mjs gas/Code.gs   # サーバー側だけ（家族コードの検査・回数の上限・モデルの切り替え）
 node tools/flow-harness.mjs              # 端末側と通し（js/sync.js と gas/Code.gs を fetch でつなぐ）
+bash tools/check-gas.sh                  # 動いている実物に向けて（貼り替えたあとの確認）
 ```
 
 ---
