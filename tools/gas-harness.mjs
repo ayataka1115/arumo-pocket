@@ -225,44 +225,44 @@ console.log('\n▸ 全体の1日の上限');
 console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下りる');
 {
   // 名前がもう無い（404）とき
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.6-flash': 404 } });
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 404 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('次の候補で答えが返る', r.ok === true, JSON.stringify(r).slice(0, 120));
-  ok('頭のいい順に下りている', ctx.__calls.models.join(',') === 'gemini-3.6-flash,gemini-flash-latest',
+  ok('頭のいい順に下りている', ctx.__calls.models.join(',') === 'gemini-3.7-flash,gemini-3.6-flash',
      ctx.__calls.models.join(','));
-  ok('落ちたモデルは長めに休ませる', ctx.__cache.get('__ttl:rest:gemini-3.6-flash') === 21600);
+  ok('落ちたモデルは長めに休ませる', ctx.__cache.get('__ttl:rest:gemini-3.7-flash') === 21600);
   ctx.__calls.models.length = 0;
   post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('次からは休ませているぶんを飛ばして1回で当たる',
-     ctx.__calls.models.join(',') === 'gemini-flash-latest', ctx.__calls.models.join(','));
+     ctx.__calls.models.join(',') === 'gemini-3.6-flash', ctx.__calls.models.join(','));
   ok('指定は書き換えない（上が戻ったらまた上を使う）', ctx.__props.get('GEMINI_MODEL') === undefined);
 }
 {
   // 回数の上限に当たった（429）とき
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.6-flash': 429 } });
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 429 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('429 でも次の頭のいいモデルが答える', r.ok === true, JSON.stringify(r).slice(0, 120));
-  ok('休ませるのは短く（戻ってくるので）', ctx.__cache.get('__ttl:rest:gemini-3.6-flash') === 300);
+  ok('休ませるのは短く（戻ってくるので）', ctx.__cache.get('__ttl:rest:gemini-3.7-flash') === 300);
 }
 {
   // 混み合っている（503）とき
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.6-flash': 503 } });
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 503 } });
   ok('503 でも次のモデルが答える', post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] }).ok === true);
 }
 {
   // 上から2つとも駄目でも、3つ目まで下りる
   const ctx = makeCtx({ rows: rowsFor(EXISTING),
-                        geminiCodes: { 'gemini-3.6-flash': 429, 'gemini-flash-latest': 404 } });
+                        geminiCodes: { 'gemini-3.7-flash': 429, 'gemini-3.6-flash': 404 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('3つ目で答えが返る', r.ok === true, JSON.stringify(r).slice(0, 120));
-  ok('3つ順に試した', ctx.__calls.models.join(',') === 'gemini-3.6-flash,gemini-flash-latest,gemini-2.5-flash',
+  ok('3つ順に試した', ctx.__calls.models.join(',') === 'gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash',
      ctx.__calls.models.join(','));
 }
 {
   // どれも混んでいるときは、その理由が伝わる文面で返す
   const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: {
-    'gemini-3.6-flash': 429, 'gemini-flash-latest': 429, 'gemini-2.5-flash': 429,
-    'gemini-2.0-flash': 429, 'gemini-2.0-flash-lite': 429 } });
+    'gemini-3.7-flash': 429, 'gemini-3.6-flash': 429, 'gemini-3.5-flash': 429,
+    'gemini-3.5-flash-lite': 429 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('混み合っていると伝える', r.ok === false && r.error.includes('混み合っています'), JSON.stringify(r));
   ok('1回の頼みで試すのは3つまで', ctx.__calls.gemini === 3, 'calls=' + ctx.__calls.gemini);
@@ -270,7 +270,7 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
   ctx.__calls.models.length = 0;
   const r2 = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('次は残りの候補へ下りる',
-     ctx.__calls.models.join(',') === 'gemini-2.0-flash,gemini-2.0-flash-lite', ctx.__calls.models.join(','));
+     ctx.__calls.models.join(',') === 'gemini-3.5-flash-lite', ctx.__calls.models.join(','));
   ok('そのときも混み合っていると伝える', r2.ok === false && r2.error.includes('混み合っています'), JSON.stringify(r2));
   // 全部休ませ切ったら、もう叩きに行かない（無駄な往復をしない）
   ctx.__calls.gemini = 0;
@@ -281,8 +281,8 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
 {
   // どれも混んでいて Gemini に届かなかったぶんは、1日の回数に数えない
   const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: {
-    'gemini-3.6-flash': 429, 'gemini-flash-latest': 429, 'gemini-2.5-flash': 429,
-    'gemini-2.0-flash': 429, 'gemini-2.0-flash-lite': 429 } });
+    'gemini-3.7-flash': 429, 'gemini-3.6-flash': 429, 'gemini-3.5-flash': 429,
+    'gemini-3.5-flash-lite': 429 } });
   for (let i = 0; i < 5; i++) post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   const state = JSON.parse(ctx.__props.get('aiQuota'));
   ok('混んでいて答えが無かったぶんは減らさない',
@@ -290,25 +290,25 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
 }
 {
   // 答えが返ったぶんは、今までどおり数える
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.6-flash': 429 } });
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 429 } });
   for (let i = 0; i < 3; i++) post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   const state = JSON.parse(ctx.__props.get('aiQuota'));
   ok('答えが返ったぶんは数える', state.counts[EXISTING] === 3, JSON.stringify(state));
 }
 {
   // 鍵が違う（403）なら、どのモデルでも同じなので下りない
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.6-flash': 403 } });
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 403 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('403 はそのまま返す', r.ok === false && r.error.includes('403'), JSON.stringify(r));
   ok('1回しか呼んでいない', ctx.__calls.gemini === 1, 'calls=' + ctx.__calls.gemini);
 }
 {
   // 運用側が GEMINI_MODEL を指定していれば、それを最優先で試す
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-2.0-flash': 404 } });
-  ctx.__props.set('GEMINI_MODEL', 'gemini-2.0-flash');
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-2.5-flash': 404 } });
+  ctx.__props.set('GEMINI_MODEL', 'gemini-2.5-flash');
   post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('指定が先頭、落ちたら頭のいい順に下りる',
-     ctx.__calls.models.join(',') === 'gemini-2.0-flash,gemini-3.6-flash', ctx.__calls.models.join(','));
+     ctx.__calls.models.join(',') === 'gemini-2.5-flash,gemini-3.7-flash', ctx.__calls.models.join(','));
 }
 
 console.log(`\n  ${pass} 件成功 / ${fail} 件失敗\n`);

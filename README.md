@@ -80,7 +80,9 @@ node /private/tmp/claude-501/-Users-macbook-Desktop-Claude-Code/7507196f-f975-4d
    （※ スプレッドシートから作らないと `getActive()` が null になる）
 2. `gas/Code.gs` と `gas/appsscript.json` を貼る
 3. **プロジェクトの設定 > スクリプト プロパティ** に `GEMINI_API_KEY` を入れる
-   （<https://aistudio.google.com/apikey> で取得。`GEMINI_MODEL` は省略可、既定 `gemini-2.5-flash`）
+   （<https://aistudio.google.com/apikey> で取得）
+   `GEMINI_MODEL` は省略可。省略すると `Code.gs` の `GEMINI_MODELS` を
+   頭のいい順に試す（落ちたモデルは休ませて、次の候補へ下りる）
 4. **デプロイ > 新しいデプロイ > ウェブアプリ**
    - 次のユーザーとして実行：**自分**
    - アクセスできるユーザー：**全員**（"Google アカウントを持つ全員" では弾かれる）
@@ -103,12 +105,20 @@ node /private/tmp/claude-501/-Users-macbook-Desktop-Claude-Code/7507196f-f975-4d
 - 棚・数え方・目標数・履歴は `ext` 列に JSON でまとめる。表の列を増やさずに機能を足せる
 - `Content-Type` ヘッダは付けない。付けると事前確認（preflight）が飛んで GAS が答えられない
 
+### シート
+
+- `data` … レコード本体（1レコード=1行）
+- `houses` … 一度でも同期しに来た家の台帳。自動で作られる。
+  AI を使う action は、ここに載っている家だけ通す。
+  **品目が0件でも載る**（棚が空の端末が、写真の読み取りを使えないと困るため）
+
 ### 検証
 
 デプロイせずに同期ロジックを確かめられる：
 
 ```bash
-node /private/tmp/claude-501/-Users-macbook-Desktop-Claude-Code/7507196f-f975-4d23-9d82-f0e8fc73aa2e/scratchpad/gas-harness.mjs gas/Code.gs
+node tools/gas-harness.mjs gas/Code.gs   # サーバー側だけ（家族コードの検査・回数の上限・モデルの切り替え）
+node tools/flow-harness.mjs              # 端末側と通し（js/sync.js と gas/Code.gs を fetch でつなぐ）
 ```
 
 ---
