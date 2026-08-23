@@ -45,9 +45,23 @@ var AI_DAILY_LIMIT = 60;    // 1つの家が1日に AI を使える回数
 var AI_GLOBAL_DAILY_LIMIT = 600;   // すべての家を合わせた1日の上限（枠を空にされないための止め）
 var QUOTA_KEY = 'aiQuota';
 
-/* Gemini のモデル候補。上から順に試して、通ったものを GEMINI_MODEL に控える。
- * 名前は Google 側で入れ替わるので、1つに賭けない。 */
-var GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+/* Gemini のモデル候補を、頭のいい順に並べたもの。上から順に試す。
+ *
+ * 落ちる理由は2つあって、扱いが違う：
+ *   - そのモデル名がもう無い（404/400）… 名前は Google 側で入れ替わる。長めに休ませる
+ *   - いま混んでいる・枠を使い切った（429/503）… しばらくすれば戻る。短く休ませる
+ * どちらも「休ませる」だけで、格下げを覚え込ませはしない。
+ * 上のモデルが戻ってきたら、また上から使う。 */
+var GEMINI_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',   // 最後の砦。賢さより「とにかく答えが返る」
+];
+var GEMINI_MAX_TRIES = 3;        // 1回の頼みで試すのはここまで（端末側が待ちきれなくなるため）
+var GEMINI_DEAD_REST = 21600;    // 名前が無いモデルを休ませる秒数（6時間・CacheService の上限）
+var GEMINI_BUSY_REST = 300;      // 混んでいるモデルを休ませる秒数（5分）
 
 /** 動作確認用。ブラウザで /exec を開くとこれが返る */
 function doGet(e) {
@@ -103,6 +117,8 @@ function doPost(e) {
       lock.releaseLock();
     }
   } catch (err) {
+    /* 誰も答えてくれなかったぶんは、使った回数に数えない */
+    if (err && err.refundAi && house) refundAiQuota(house);
     return json({ ok: false, error: String((err && err.message) || err) });
   }
 }
@@ -390,36 +406,53 @@ function gemini(prompt, dataUrl) {
     generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
   });
 
-  /* モデル名が Google 側で入れ替わると 404 が返り、写真の読み取りも献立も
-   * まるごと動かなくなる。原因が見えないまま「使えない」状態が続くのが一番困るので、
-   * 通らなかったら順に次を試す。GEMINI_MODEL が入っていればそれを最優先。 */
-  var models = [];
-  var chosen = props.getProperty('GEMINI_MODEL');
-  if (chosen) models.push(chosen);
-  for (var g = 0; g < GEMINI_MODELS.length; g++) {
-    if (models.indexOf(GEMINI_MODELS[g]) < 0) models.push(GEMINI_MODELS[g]);
-  }
+  /* 頭のいい順に試す。名前が無ければ次へ、混んでいても次へ。
+   * 休ませている（さっき駄目だった）モデルは飛ばすので、
+   * ふだんは1回目で当たり、余分な往復は起きない。 */
+  var cache = CacheService.getScriptCache();
+  var models = candidateModels(props);
+  var body = '', tried = 0, skipped = 0, busy = 0, lastCode = 0, lastMsg = '';
 
-  var code = 0, body = '', lastMsg = '';
-  for (var t = 0; t < models.length; t++) {
+  for (var t = 0; t < models.length && tried < GEMINI_MAX_TRIES; t++) {
+    var model = models[t];
+    if (cache.get('rest:' + model)) { skipped++; continue; }   // いま休ませているもの
+
+    tried++;
     var res = UrlFetchApp.fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/' + models[t]
+      'https://generativelanguage.googleapis.com/v1beta/models/' + model
         + ':generateContent?key=' + encodeURIComponent(apiKey),
       { method: 'post', contentType: 'application/json', muteHttpExceptions: true, payload: payload }
     );
-    code = res.getResponseCode();
+    lastCode = res.getResponseCode();
     body = res.getContentText();
-    if (code === 200) {
-      /* 通ったモデルを控えておく。次からは1回目で当たる */
-      if (models[t] !== chosen) props.setProperty('GEMINI_MODEL', models[t]);
-      break;
-    }
+    if (lastCode === 200) break;
+
     try { lastMsg = JSON.parse(body).error.message; } catch (ignore) { lastMsg = body; }
-    // そのモデルが無い／使えないときだけ次を試す。鍵や枠の問題なら、試し直しても同じ
-    if (code !== 404 && code !== 400) break;
+
+    if (lastCode === 404 || lastCode === 400) {
+      // その名前のモデルはもう無い。しばらく飛ばして、次の頭のいいものへ
+      cache.put('rest:' + model, '1', GEMINI_DEAD_REST);
+      continue;
+    }
+    if (lastCode === 429 || lastCode === 503) {
+      // 回数の上限、または混み合っている。少し休ませて、次の頭のいいものへ
+      cache.put('rest:' + model, '1', GEMINI_BUSY_REST);
+      busy++;
+      continue;
+    }
+    break;   // 鍵が違うなど。どのモデルで試しても同じなので、ここで止める
   }
-  if (code !== 200) {
-    throw new Error('AI が答えられませんでした（' + code + '）：' + lastMsg);
+
+  if (lastCode !== 200) {
+    if (busy || (skipped && !tried)) {
+      /* Gemini には一度も答えてもらえていない。
+       * この家の1日の回数を減らしたままにすると、混んでいた時間帯に
+       * 何度か試しただけで、その日はもう使えなくなってしまう。 */
+      var busyErr = new Error('いま混み合っています。少し待ってから、もう一度おねがいします');
+      busyErr.refundAi = true;
+      throw busyErr;
+    }
+    throw new Error('AI が答えられませんでした（' + lastCode + '）：' + lastMsg);
   }
 
   var data = JSON.parse(body);
@@ -436,6 +469,21 @@ function gemini(prompt, dataUrl) {
   } catch (err) {
     throw new Error('AI の返事を読めませんでした');
   }
+}
+
+/**
+ * 試すモデルを、頭のいい順に並べて返す。
+ * GEMINI_MODEL に指定があればそれを先頭に置く（運用側の指定が最優先）。
+ * 指定は書き換えない。上のモデルが戻ってきたら、また上から使いたいため。
+ */
+function candidateModels(props) {
+  var models = [];
+  var chosen = props.getProperty('GEMINI_MODEL');
+  if (chosen) models.push(chosen);
+  for (var i = 0; i < GEMINI_MODELS.length; i++) {
+    if (models.indexOf(GEMINI_MODELS[i]) < 0) models.push(GEMINI_MODELS[i]);
+  }
+  return models;
 }
 
 /* ==================== 小道具 ==================== */
@@ -565,6 +613,17 @@ function takeAiQuota(house) {
   state.counts['*'] = all;
   props.setProperty(QUOTA_KEY, JSON.stringify(state));
   return true;
+}
+
+/** 使えなかった1回ぶんを戻す（Gemini に届かなかったときだけ） */
+function refundAiQuota(house) {
+  var props = PropertiesService.getScriptProperties();
+  var state;
+  try { state = JSON.parse(props.getProperty(QUOTA_KEY) || '{}'); } catch (err) { return; }
+  if (!state.counts) return;
+  if (state.counts[house]) state.counts[house]--;
+  if (state.counts['*']) state.counts['*']--;
+  props.setProperty(QUOTA_KEY, JSON.stringify(state));
 }
 
 function getSheet() {
