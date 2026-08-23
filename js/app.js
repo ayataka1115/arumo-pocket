@@ -33,6 +33,11 @@ $('#urgent-list').addEventListener('click', e => {
   if (li) openShelf(li.dataset.shelf);
 });
 
+$('#soon-list').addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (li) openShelf(li.dataset.shelf);
+});
+
 $('#shelf-tabs').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   shelfTab = b.dataset.tab;
@@ -66,7 +71,10 @@ $('#shelf-list').addEventListener('click', e => {
     const from = it.stock;
     it.stock = order[(order.indexOf(it.stock) + 1) % order.length];
     if (it.stock === 'empty') return removeCard(li, () => useUp(it, true));
-    touch(it, '残量を変えた', { from: stockLabel(from), to: stockLabel(it.stock) });
+    /* きれた → たっぷり は補充。ここを補充として残さないと、
+     * 次に切れたときの「何日もったか」が前の補充から数えられてしまう（機能F） */
+    touch(it, from === 'empty' ? '増やした' : '残量を変えた',
+          { from: stockLabel(from), to: stockLabel(it.stock) });
   } else if (act === 'use') {
     popFx(e.target.closest('[data-act]'));
     return removeCard(li, () => useUp(it));
@@ -81,6 +89,7 @@ $('#shelf-list').addEventListener('click', e => {
 
 /* 使い切ったら棚から出し、同じものが買い物リストに無ければ足す */
 function useUp(it, keepRecord) {
+  noteCycle(it);                 /* 何日もったかを覚えておく（機能F） */
   if (keepRecord) {
     touch(it, 'きれた');
   } else {
@@ -1160,7 +1169,7 @@ function exportHistoryCsv() {
 
 function exportJson() {
   shareFile(`arumo-backup-${stamp()}.json`,
-    JSON.stringify({ items, shop, chat, settings, exportedAt: new Date().toISOString() }, null, 2),
+    JSON.stringify({ items, shop, chat, settings, cycles, exportedAt: new Date().toISOString() }, null, 2),
     'application/json');
 }
 
@@ -1238,7 +1247,9 @@ maybeNotify();
 /* 落ち着いた頃に「今日はどう？」を一度だけ出す */
 setTimeout(() => {
   const lacking = live(items).filter(isLacking);
+  const soon = live(items).filter(isSoonOut);
   if (lacking.length) fireMood('lack-found', lacking.length);
+  else if (soon.length) fireMood('soon-out', soon[0].name);   /* 機能F */
   else if (live(items).length) fireMood('nothing-urgent');
 }, 1200);
 

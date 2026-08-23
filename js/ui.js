@@ -31,6 +31,7 @@ const MOOD_SCENES = {
   'shelf-added':        { char: 'star',   ease: 'joy',   text: n => `「${n}」の棚ができたよ` },
   'nothing-urgent':     { char: 'sleepy', ease: 'quiet', text: () => '今日はゆっくりできそう' },
   'lack-found':         { char: 'cloud',  ease: 'quiet', text: n => `${n}品、足りてないみたい` },
+  'soon-out':           { char: 'sleepy', ease: 'quiet', text: n => `${n}、そろそろかも` },
   'expired':            { char: 'cloud',  ease: 'sorry', text: n => `${n}、期限すぎちゃった` },
 };
 
@@ -297,6 +298,9 @@ function greeting() {
 function renderHome() {
   const alive = live(items);
   const urgent = alive.filter(isUrgent);
+  /* そろそろ、なくなりそう（機能F）。
+   * 「気になる子たち」に出ているものは isSoonOut がはじくので、重ならない */
+  const soon = alive.filter(isSoonOut).sort((a, b) => daysToEmpty(a).left - daysToEmpty(b).left);
 
   $('#house-name').textContent = settings.houseName || 'わが家';
   $('#house-initial').textContent = (settings.houseName || 'わ').trim().slice(0, 1);
@@ -308,10 +312,12 @@ function renderHome() {
   $('#hero-sub').textContent =
     !alive.length ? 'まずは棚をひらいて、入っているものを教えてね' :
     worst ? `${worst.name}、${isLacking(worst) ? 'そろそろ足りないよ' : '期限が近いよ'}` :
+    soon[0] ? `${soon[0].name}、そろそろかも` :
     '今日はあわてる品はなさそう';
 
   const heroId = settings.heroCharMode === 'fixed' ? settings.heroChar
     : worst ? charForItem(worst.name)
+    : soon[0] ? charForItem(soon[0].name)
     : (alive[0] ? charForItem(alive[0].name) : 'heart');
   $('#hero-char').src = charSrc(heroId);
 
@@ -328,6 +334,22 @@ function renderHome() {
         <span class="u-name">${esc(it.name)}</span>
         <span class="u-shelf type-caption">${esc(sh ? sh.name : '')}</span>
         <span class="tag over">${esc(tag)}</span>
+      </li>`;
+    }).join('');
+  }
+
+  /* 最大3件だけ出す */
+  const soonBox = $('#soon');
+  soonBox.hidden = soon.length === 0;
+  if (soon.length) {
+    $('#soon-count').textContent = soon.length + '件';
+    $('#soon-list').innerHTML = soon.slice(0, 3).map(it => {
+      const sh = shelfOf(it.shelf);
+      return `<li data-id="${it.id}" data-shelf="${esc(it.shelf)}">
+        <img src="${charSrc(charForItem(it.name))}" alt="">
+        <span class="u-name">${esc(it.name)}</span>
+        <span class="u-shelf type-caption">${esc(sh ? sh.name : '')}</span>
+        <span class="tag soon">${esc(soonTag(it))}</span>
       </li>`;
     }).join('');
   }
@@ -717,6 +739,16 @@ function renderStats() {
       <i class="bar"><b style="--w:${w}%;width:var(--w);background:var(--shelf-${sh.color}-deep)"></b></i>
     </div>`;
   }).join('');
+
+  /* おうちのペース（機能F）。使い切った記録から、だいたいのもち日数を出す */
+  const pace = paceRanking();
+  $('#stat-pace').innerHTML = pace.length
+    ? pace.map(r => `<li>
+        <img src="${charSrc(charForItem(r.name))}" alt="">
+        <span class="stat-name">${esc(r.name)}</span>
+        <b class="type-mono">だいたい${r.pace.days}日 / ${r.pace.n}回</b>
+      </li>`).join('')
+    : '<li class="muted type-body-sm">使い切った記録が2回たまると、ここに出ます。</li>';
 
   /* 誰が何回動かしたか。履歴（機能B）をそのまま数える */
   const tally = {};

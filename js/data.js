@@ -297,6 +297,78 @@ function lackTag(it) {
   return '不足';
 }
 
+/* ============ 消費のペース（機能F） ============ */
+/* 使い切るたびに「何日もったか」を1行だけ残し、次からの目安にする。
+ * 品目の history は最新20件で切れ、消した行も30日で流れるので、
+ * 学習に使う記録だけは別に持つ。端末の中だけ・最新200件。
+ * 家族と同期しないのは、暮らしのペースは端末ごとに違わないから
+ * （同じ棚を見ていれば、どの端末でも同じ数字に育つ）。 */
+const CYCLE_MAX = 200;
+const PACE_MIN = 2;              /* 2回ぶん貯まるまでは何も言わない */
+const PACE_SOON = 2;             /* 残り2日を切ったら「そろそろ」 */
+let cycles = LS.get('cycles', []);
+
+/* 補充とみなす操作。ここから数えて「何日もったか」を測る */
+const RESTOCK_ACTIONS = ['入れた', '増やした', '写真から入れた'];
+
+function lastRestock(it) {
+  const h = it.history || [];
+  for (let i = h.length - 1; i >= 0; i--) {
+    if (RESTOCK_ACTIONS.includes(h[i].action)) return Number(h[i].at);
+  }
+  return Number(it.addedAt || Date.now());
+}
+
+/* 使い切ったときに1件記録する */
+function noteCycle(it) {
+  const days = Math.round((Date.now() - lastRestock(it)) / 86400000);
+  /* 負の日数（端末の時計のずれ）と、1年以上の置きっぱなしは学習に混ぜない */
+  if (!it.name || !(days >= 0) || days > 365) return;
+  cycles = cycles.concat([{ name: it.name, shelf: it.shelf, days, at: Date.now() }]).slice(-CYCLE_MAX);
+  LS.set('cycles', cycles);
+}
+
+/* その品目が、だいたい何日でなくなるか。
+ * 直近5回の「真ん中の値」を採る。1回だけ極端に長い回があっても引きずられない */
+function paceOf(name) {
+  const all = cycles.filter(c => c.name === name);
+  if (all.length < PACE_MIN) return null;
+  const d = all.slice(-5).map(c => c.days).sort((a, b) => a - b);
+  const mid = Math.floor(d.length / 2);
+  const med = d.length % 2 ? d[mid] : Math.round((d[mid - 1] + d[mid]) / 2);
+  return { days: Math.max(1, med), n: all.length };
+}
+
+/* あと何日くらいでなくなりそうか。学習が足りなければ null */
+function daysToEmpty(it) {
+  const p = paceOf(it.name);
+  if (!p) return null;
+  const used = (Date.now() - lastRestock(it)) / 86400000;
+  return { left: Math.ceil(p.days - used), pace: p.days, n: p.n };
+}
+
+/* 「そろそろ、なくなりそう」。
+ * すでに不足・期限切れで「気になる子たち」に出ているものは、二重に出さない */
+function isSoonOut(it) {
+  if (isUrgent(it)) return false;
+  const d = daysToEmpty(it);
+  return d !== null && d.left <= PACE_SOON;
+}
+const soonTag = it => {
+  const d = daysToEmpty(it);
+  if (!d) return '';
+  return d.left <= 0 ? 'そろそろ' : `あと${d.left}日くらい`;
+};
+
+/* よく買うものから順に、だいたいのもち日数を並べる（分析画面用） */
+function paceRanking(limit = 8) {
+  const names = Array.from(new Set(cycles.map(c => c.name)));
+  return names.map(name => ({ name, pace: paceOf(name) }))
+    .filter(r => r.pace)
+    .sort((a, b) => b.pace.n - a.pace.n || a.pace.days - b.pace.days)
+    .slice(0, limit);
+}
+
 /* ============ 小道具 ============ */
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
