@@ -26,8 +26,10 @@
  * 使う前に（スクリプト プロパティ）：
  *   GEMINI_API_KEY ... 写真の読み取りと献立に使う。https://aistudio.google.com/apikey で取る
  *   GEMINI_MODEL   ... 省略可。ここに書いたものを最優先で試す。
- *                      落ちたときは GEMINI_MODELS を頭のいい順に下りていく。
+ *                      落ちたときは候補を頭のいい順に下りていく。
  *                      コード側がここを書き換えることはない
+ *   GEMINI_MODELS  ... 省略可。候補そのものをカンマ区切りで指定する。
+ *                      無料枠の中身が変わったとき、コードを触らずに直せる
  */
 
 var SHEET_NAME = 'data';
@@ -55,15 +57,21 @@ var QUOTA_KEY = 'aiQuota';
  * どちらも「休ませる」だけで、格下げを覚え込ませはしない。
  * 上のモデルが戻ってきたら、また上から使う。 */
 var GEMINI_MODELS = [
-  'gemini-3.7-flash',        // 2026-08-13 GA。いちばん賢く、いちばん安い
-  'gemini-3.6-flash',        // 2026-07-21 GA
-  'gemini-3.5-flash',        // 2026-05-19 GA
-  'gemini-3.5-flash-lite',   // 最後の砦。賢さより「とにかく答えが返る」
+  /* 上ほど賢い。無料枠で通らなければ勝手に下へ下りるので、
+   * 「無料で使えるか怪しいが、使えたら嬉しい」ものを上に置いてある。 */
+  'gemini-3.7-flash',        // 2026-08-13 GA。無料枠の有無は情報が割れている
+  'gemini-3.6-flash',        // 2026-07-21 GA。同上
+  'gemini-3.5-flash',        // 2026-05-19 GA。2026-07-16 時点で無料枠の行あり
+  'gemini-3.1-flash-lite',   // 無料枠の行が確認できているもの
+  'gemini-2.5-flash',        // 無料枠あり（10 RPM / 250 RPD）。2026-10-16 終了予定
+  'gemini-2.5-flash-lite',   // 無料枠あり（15 RPM / 1000 RPD）。同上。最後の砦
 ];
-/* 2026-08-23 時点で、上の4つはどれも現役（終了予定の告知なし）。
- * 2.x 系は入れていない：2.0 系は 2026-06-01 に停止済み、
- * 2.5 系も 2026-10-16 に終了予定。gemini-flash-latest という別名も廃止済みで 404 になる。
- * 名前を足すときは、必ず現役かどうか確かめてから。死んだ名前は往復が1回増えるだけ損。 */
+/* Pro 系は入れない。2026年4月に無料枠から外れている。
+ * 2.5 系は10月に終わるが、いま確実に無料で使えるのはここなので、いちばん下に残してある。
+ * 終わったら 404 になり、自動で飛ばされるだけなので置きっぱなしで害はない。
+ *
+ * 無料枠の中身は Google 側でよく動く。ここを書き換えなくても済むよう、
+ * スクリプト プロパティ GEMINI_MODELS に「カンマ区切り」で並べれば、そちらが使われる。 */
 var GEMINI_MAX_TRIES = 3;        // 1回の頼みで試すのはここまで（端末側が待ちきれなくなるため）
 var GEMINI_DEAD_REST = 21600;    // 名前が無いモデルを休ませる秒数（6時間・CacheService の上限）
 var GEMINI_BUSY_REST = 300;      // 混んでいるモデルを休ませる秒数（5分）
@@ -416,7 +424,7 @@ function gemini(prompt, dataUrl) {
    * ふだんは1回目で当たり、余分な往復は起きない。 */
   var cache = CacheService.getScriptCache();
   var models = candidateModels(props);
-  var body = '', tried = 0, skipped = 0, busy = 0, lastCode = 0, lastMsg = '';
+  var body = '', tried = 0, skipped = 0, busy = 0, lastCode = 0, lastMsg = '', keyBroken = false;
 
   for (var t = 0; t < models.length && tried < GEMINI_MAX_TRIES; t++) {
     var model = models[t];
@@ -434,21 +442,30 @@ function gemini(prompt, dataUrl) {
 
     try { lastMsg = JSON.parse(body).error.message; } catch (ignore) { lastMsg = body; }
 
-    if (lastCode === 404 || lastCode === 400) {
-      // その名前のモデルはもう無い。しばらく飛ばして、次の頭のいいものへ
+    /* 鍵そのものが違うときだけは、どのモデルで試しても同じなので、ここで止める。
+     * これを「403 は全部だめ」と一括りにすると、
+     * 無料の鍵で有料モデルを引いたときにも止まってしまい、下りられない。 */
+    if (badKey(lastMsg)) { keyBroken = true; break; }
+
+    if (lastCode === 404) {
+      // その名前のモデルはもう無い。長めに休ませて、次の頭のいいものへ
       cache.put('rest:' + model, '1', GEMINI_DEAD_REST);
       continue;
     }
-    if (lastCode === 429 || lastCode === 503) {
-      // 回数の上限、または混み合っている。少し休ませて、次の頭のいいものへ
+    if (lastCode === 400 || lastCode === 403 || lastCode === 429 || lastCode === 503) {
+      /* この鍵では使えない（無料枠に無い）／回数の上限／混み合っている。
+       * どれも「少し置けば変わりうる」ので、短く休ませて次の頭のいいものへ下りる。 */
       cache.put('rest:' + model, '1', GEMINI_BUSY_REST);
       busy++;
       continue;
     }
-    break;   // 鍵が違うなど。どのモデルで試しても同じなので、ここで止める
+    break;   // それ以外。どのモデルでも同じ見込みなので止める
   }
 
   if (lastCode !== 200) {
+    if (keyBroken) {
+      throw new Error('GEMINI_API_KEY が正しくありません（Apps Script の「プロジェクトの設定 > スクリプト プロパティ」を見直してください）');
+    }
     if (busy || (skipped && !tried)) {
       /* Gemini には一度も答えてもらえていない。
        * この家の1日の回数を減らしたままにすると、混んでいた時間帯に
@@ -482,13 +499,36 @@ function gemini(prompt, dataUrl) {
  * 指定は書き換えない。上のモデルが戻ってきたら、また上から使いたいため。
  */
 function candidateModels(props) {
+  var list = GEMINI_MODELS;
+
+  /* 無料枠の中身は Google 側でよく動く。コードを触らずに並べ替えられるよう、
+   * スクリプト プロパティ GEMINI_MODELS（カンマ区切り）があればそちらを使う。 */
+  var override = props.getProperty('GEMINI_MODELS');
+  if (override) {
+    var parsed = [];
+    var raw = String(override).split(',');
+    for (var r = 0; r < raw.length; r++) {
+      var name = raw[r].trim();
+      if (name) parsed.push(name);
+    }
+    if (parsed.length) list = parsed;
+  }
+
   var models = [];
   var chosen = props.getProperty('GEMINI_MODEL');
   if (chosen) models.push(chosen);
-  for (var i = 0; i < GEMINI_MODELS.length; i++) {
-    if (models.indexOf(GEMINI_MODELS[i]) < 0) models.push(GEMINI_MODELS[i]);
+  for (var i = 0; i < list.length; i++) {
+    if (models.indexOf(list[i]) < 0) models.push(list[i]);
   }
   return models;
+}
+
+/** 鍵そのものが通っていないか。モデルを替えても直らないのはこれだけ */
+function badKey(msg) {
+  var m = String(msg || '');
+  return m.indexOf('API_KEY_INVALID') >= 0
+      || m.indexOf('API key not valid') >= 0
+      || m.indexOf('API key expired') >= 0;
 }
 
 /* ==================== 小道具 ==================== */
