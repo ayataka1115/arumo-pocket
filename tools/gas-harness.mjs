@@ -30,7 +30,7 @@ function makeSheet(rows = [], cols = 14) {
 }
 
 function makeCtx({ rows = [], houses = null, geminiOut = { recipes: [{ title: 'てすと' }] }, today = '20260823',
-                   geminiCodes = null } = {}) {
+                   geminiCodes = null, geminiBadKey = false } = {}) {
   const props = new Map();
   const cache = new Map();
   const calls = { gemini: 0, models: [] };
@@ -59,6 +59,10 @@ function makeCtx({ rows = [], houses = null, geminiOut = { recipes: [{ title: '�
       const model = String(url).match(/models\/([^:]+):/)[1];
       calls.models.push(model);
       // geminiCodes: モデル名 -> HTTP コード。無ければ全部 200
+      if (geminiBadKey) return {
+        getResponseCode: () => 400,
+        getContentText: () => JSON.stringify({ error: { message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT' } }),
+      };
       const code = geminiCodes ? (geminiCodes[model] ?? 200) : 200;
       return {
         getResponseCode: () => code,
@@ -262,7 +266,7 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
   // どれも混んでいるときは、その理由が伝わる文面で返す
   const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: {
     'gemini-3.7-flash': 429, 'gemini-3.6-flash': 429, 'gemini-3.5-flash': 429,
-    'gemini-3.5-flash-lite': 429 } });
+    'gemini-3.1-flash-lite': 429, 'gemini-2.5-flash': 429, 'gemini-2.5-flash-lite': 429 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('混み合っていると伝える', r.ok === false && r.error.includes('混み合っています'), JSON.stringify(r));
   ok('1回の頼みで試すのは3つまで', ctx.__calls.gemini === 3, 'calls=' + ctx.__calls.gemini);
@@ -270,11 +274,13 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
   ctx.__calls.models.length = 0;
   const r2 = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('次は残りの候補へ下りる',
-     ctx.__calls.models.join(',') === 'gemini-3.5-flash-lite', ctx.__calls.models.join(','));
+     ctx.__calls.models.join(',') === 'gemini-3.1-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite',
+     ctx.__calls.models.join(','));
   ok('そのときも混み合っていると伝える', r2.ok === false && r2.error.includes('混み合っています'), JSON.stringify(r2));
   // 全部休ませ切ったら、もう叩きに行かない（無駄な往復をしない）
   ctx.__calls.gemini = 0;
   const r3 = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
+  void r3;
   ok('全部休ませたら叩きに行かない', ctx.__calls.gemini === 0, 'calls=' + ctx.__calls.gemini);
   ok('待つように伝える', r3.ok === false && r3.error.includes('混み合っています'), JSON.stringify(r3));
 }
@@ -282,7 +288,7 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
   // どれも混んでいて Gemini に届かなかったぶんは、1日の回数に数えない
   const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: {
     'gemini-3.7-flash': 429, 'gemini-3.6-flash': 429, 'gemini-3.5-flash': 429,
-    'gemini-3.5-flash-lite': 429 } });
+    'gemini-3.1-flash-lite': 429, 'gemini-2.5-flash': 429, 'gemini-2.5-flash-lite': 429 } });
   for (let i = 0; i < 5; i++) post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   const state = JSON.parse(ctx.__props.get('aiQuota'));
   ok('混んでいて答えが無かったぶんは減らさない',
@@ -295,12 +301,47 @@ console.log('\n▸ モデルが落ちたら、次の頭のいいモデルへ下�
   const state = JSON.parse(ctx.__props.get('aiQuota'));
   ok('答えが返ったぶんは数える', state.counts[EXISTING] === 3, JSON.stringify(state));
 }
+console.log('\n▸ 無料の鍵で有料モデルを引いても、下りて答えを返す');
 {
-  // 鍵が違う（403）なら、どのモデルでも同じなので下りない
-  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 403 } });
+  // 無料枠に無いモデルは 403 / 429 で断られる。止まらずに下りること
+  const ctx = makeCtx({ rows: rowsFor(EXISTING),
+                        geminiCodes: { 'gemini-3.7-flash': 403, 'gemini-3.6-flash': 429 } });
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
-  ok('403 はそのまま返す', r.ok === false && r.error.includes('403'), JSON.stringify(r));
+  ok('403 でも止まらず、下の無料モデルが答える', r.ok === true, JSON.stringify(r).slice(0, 120));
+  ok('頭のいい順に下りている',
+     ctx.__calls.models.join(',') === 'gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash',
+     ctx.__calls.models.join(','));
+  ctx.__calls.models.length = 0;
+  post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
+  ok('2回目からは有料モデルを叩かない',
+     ctx.__calls.models.join(',') === 'gemini-3.5-flash', ctx.__calls.models.join(','));
+}
+{
+  // 上5つが無料枠外でも、いちばん下の確実に無料なものまで下りきる
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: {
+    'gemini-3.7-flash': 429, 'gemini-3.6-flash': 429, 'gemini-3.5-flash': 429,
+    'gemini-3.1-flash-lite': 429, 'gemini-2.5-flash': 429 } });
+  let r;
+  for (let i = 0; i < 3; i++) r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
+  ok('最後の砦（2.5-flash-lite）で答えが返る', r.ok === true, JSON.stringify(r).slice(0, 120));
+  ok('最後に叩いたのは 2.5-flash-lite',
+     ctx.__calls.models[ctx.__calls.models.length - 1] === 'gemini-2.5-flash-lite',
+     ctx.__calls.models.join(','));
+}
+{
+  // 鍵そのものが違うときだけは、下りずに止まる（何回叩いても同じなので）
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiBadKey: true });
+  const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
+  ok('鍵が違うと伝える', r.ok === false && r.error.includes('GEMINI_API_KEY'), JSON.stringify(r));
   ok('1回しか呼んでいない', ctx.__calls.gemini === 1, 'calls=' + ctx.__calls.gemini);
+}
+{
+  // 候補そのものをスクリプト プロパティで差し替えられる
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'my-first-model': 404 } });
+  ctx.__props.set('GEMINI_MODELS', ' my-first-model , my-second-model ');
+  post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
+  ok('指定した候補だけを順に試す',
+     ctx.__calls.models.join(',') === 'my-first-model,my-second-model', ctx.__calls.models.join(','));
 }
 {
   // 運用側が GEMINI_MODEL を指定していれば、それを最優先で試す
