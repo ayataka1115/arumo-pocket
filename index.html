@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" id="meta-theme" content="#FDFCF8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="アルノポケット">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="assets/logo-mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=DM+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<title>アルノポケット</title>
+</head>
+<body>
+
+<header class="topbar">
+  <button id="house-chip" class="house-chip">
+    <i id="house-initial" class="house-initial">わ</i>
+    <span id="house-name">わが家</span>
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg>
+  </button>
+  <button id="sync-chip" class="sync-chip" data-state="off" aria-label="家族と合わせる">
+    <i class="dot"></i><span id="sync-text">この端末だけ</span>
+  </button>
+</header>
+
+<main id="main">
+
+  <!-- ========== ホーム（棚一覧） ========== -->
+  <section id="view-home" class="view">
+    <div class="hero">
+      <img id="hero-char" class="hero-char motion-bob" src="assets/char-heart.svg" alt="">
+      <div class="hero-text">
+        <div id="hero-greet" class="hero-greet type-h2"></div>
+        <div id="hero-sub" class="hero-sub type-body-sm"></div>
+      </div>
+    </div>
+
+    <section id="urgent" class="widget" hidden>
+      <h2 class="widget-head type-label">気になる子たち<span id="urgent-count" class="widget-count type-mono"></span></h2>
+      <ul id="urgent-list" class="urgent-list"></ul>
+    </section>
+
+    <h2 class="section-head type-label">おうちの棚</h2>
+    <div id="shelf-grid" class="shelf-grid"></div>
+  </section>
+
+  <!-- ========== 棚の中（詳細） ========== -->
+  <section id="view-shelf" class="view" hidden>
+    <div class="shelf-head">
+      <button id="shelf-back" class="icon-btn" aria-label="戻る">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <img id="shelf-head-icon" class="shelf-head-icon" src="" alt="">
+      <div class="shelf-head-text">
+        <div id="shelf-head-name" class="type-h2"></div>
+        <div id="shelf-head-count" class="type-mono muted"></div>
+      </div>
+    </div>
+
+    <!-- 入れ方は2つ（写真／手で）なので、並べて置く。
+         ＋入れる は以前は画面に浮いていて、品目の行を覆っていた。 -->
+    <div class="shelf-actions">
+      <button id="btn-shoot" class="camera-btn">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8.5h3l1.4-2.2h7.2L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.4"/>
+        </svg>
+        棚をぱちり
+      </button>
+      <button id="fab" class="fab">＋ 入れる</button>
+    </div>
+
+    <div class="seg tabs2" id="shelf-tabs">
+      <button type="button" data-tab="all" class="is-on">ぜんぶ <i id="tab-all-n" class="type-mono"></i></button>
+      <button type="button" data-tab="lack">不足 <i id="tab-lack-n" class="type-mono"></i></button>
+    </div>
+
+    <ul id="shelf-list" class="list"></ul>
+    <p id="shelf-empty" class="empty type-body-sm" hidden></p>
+  </section>
+
+  <!-- ========== 買うもの ========== -->
+  <section id="view-shop" class="view" hidden>
+    <h2 class="section-head type-label">買うもの<span id="shop-left" class="widget-count type-mono"></span></h2>
+
+    <div id="shop-progress" class="progress" hidden>
+      <img id="shop-face" class="progress-face" src="" alt="">
+      <i class="progress-bar"><b id="shop-bar"></b></i>
+      <span id="shop-ratio" class="progress-text"></span>
+    </div>
+
+    <form id="shop-quick" class="quick-add">
+      <input id="shop-input" type="text" placeholder="買ってきてほしいもの" enterkeyhint="done" autocomplete="off">
+      <button type="submit" class="btn-primary sm">追加</button>
+    </form>
+
+    <ul id="shop-list" class="list"></ul>
+    <div id="shop-empty" class="empty-state" hidden>
+      <img class="empty-char motion-bob" src="assets/char-sleepy.svg" alt="">
+      <p class="type-body-sm">買うものはまだありません。<br>棚で「使い切った」を押すと、ここに並びます。</p>
+    </div>
+
+    <div class="row-between">
+      <button id="btn-clear-done" class="btn-text" hidden>買ったものを片付ける</button>
+      <button id="btn-receipt" class="btn-ghost">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 8h6M9 11.5h6M9 15h3"/>
+        </svg>
+        レシートで一気に消す
+      </button>
+    </div>
+
+    <h2 class="section-head type-label">家族のことづて</h2>
+    <div id="chat-panel" class="chat-panel">
+      <ul id="chat-list" class="chat-list"></ul>
+      <div class="chat-stamps" id="chat-stamps"></div>
+      <form id="chat-form" class="quick-add">
+        <input id="chat-input" type="text" placeholder="ひとこと" enterkeyhint="send" autocomplete="off">
+        <button type="submit" class="btn-primary sm">送る</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== レシピ ========== -->
+  <section id="view-recipes" class="view" hidden>
+    <div class="row-between">
+      <h2 class="section-head type-label">今日つくれそうなもの</h2>
+      <button id="btn-recipes" class="btn-text accent">ほかにも</button>
+    </div>
+    <section id="from-food" class="widget" hidden>
+      <h2 class="widget-head type-label">食材から探す</h2>
+      <div id="from-food-list"></div>
+    </section>
+
+    <div id="recipe-list" class="recipe-list"></div>
+    <p id="recipe-empty" class="empty type-body-sm"></p>
+  </section>
+
+  <!-- ========== 分析 ========== -->
+  <section id="view-stats" class="view" hidden>
+    <h2 class="section-head type-label">いまの様子</h2>
+    <div id="stat-cards" class="stat-cards"></div>
+    <h2 class="section-head type-label">棚べつ</h2>
+    <div id="stat-shelves" class="stat-shelves"></div>
+    <h2 class="section-head type-label">よく動かしてくれた人</h2>
+    <ol id="stat-rank" class="stat-rank"></ol>
+  </section>
+
+</main>
+
+<div id="mood" class="mood" hidden>
+  <img id="mood-char" class="mood-char" src="" alt="">
+  <span id="mood-text" class="type-body-sm"></span>
+</div>
+
+
+<nav class="tabbar">
+  <button class="tab is-active" data-view="home">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M4 10.5L12 4l8 6.5V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg>
+    <span>ホーム</span>
+  </button>
+  <button class="tab" data-view="shop">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M6 8h12l-1 11.4H7z"/><path d="M9.2 8V6.2a2.8 2.8 0 0 1 5.6 0V8"/></svg>
+    <span>買うもの<i id="shop-badge" class="badge" hidden></i></span>
+  </button>
+  <button class="tab" data-view="recipes">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M7 3.5v8a2.5 2.5 0 0 0 5 0v-8M9.5 11.5V20"/><path d="M17 3.5c-1.5 1.4-2 3.4-2 5.4s.6 2.6 2 2.6V20"/></svg>
+    <span>レシピ</span>
+  </button>
+  <button class="tab" data-view="stats">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
+    <span>分析</span>
+  </button>
+  <button class="tab" data-view="set">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M2.8 12h2.4M18.8 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/></svg>
+    <span>設定</span>
+  </button>
+</nav>
+
+<!-- ========== 追加シート ========== -->
+<div id="sheet-backdrop" class="backdrop" hidden></div>
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <button id="sheet-cancel" class="btn-text">やめる</button>
+    <strong id="sheet-title">棚に入れる</strong>
+    <button id="sheet-save" class="btn-text accent">入れる</button>
+  </div>
+  <div class="sheet-body">
+    <label class="field-label">なに</label>
+    <input id="f-name" type="text" class="field" placeholder="例：にんじん" autocomplete="off" enterkeyhint="done">
+
+    <label class="field-label">どの棚</label>
+    <div class="chip-row" id="f-shelf"></div>
+
+    <label class="field-label">数え方</label>
+    <div class="seg" id="f-mode">
+      <button type="button" data-mode="qty">個数</button>
+      <button type="button" data-mode="stock">残量</button>
+    </div>
+
+    <div id="qty-block">
+      <label class="field-label">いくつ</label>
+      <div class="qty-row">
+        <button type="button" class="step" data-step="-1" aria-label="減らす">−</button>
+        <output id="f-qty" class="qty-val">1</output>
+        <button type="button" class="step" data-step="1" aria-label="増やす">＋</button>
+      </div>
+      <div class="chip-row" id="qty-chips"></div>
+      <div class="seg wrap" id="f-unit"></div>
+
+      <label class="field-label">これを下回ったら「不足」</label>
+      <div class="chip-row" id="target-chips"></div>
+
+      <label class="field-label">いつまで</label>
+      <div class="chip-row" id="expiry-chips">
+        <button type="button" class="chip" data-days="1">明日</button>
+        <button type="button" class="chip" data-days="3">3日後</button>
+        <button type="button" class="chip" data-days="7">1週間</button>
+        <button type="button" class="chip" data-days="30">1か月</button>
+        <button type="button" class="chip" data-days="">なし</button>
+      </div>
+      <input id="f-expiry" type="date" class="field" style="margin-top:9px">
+    </div>
+
+    <div id="stock-block" hidden>
+      <label class="field-label">どれくらい</label>
+      <div class="seg wrap" id="f-stock"></div>
+      <label class="field-label">これを下回ったら「不足」</label>
+      <div class="seg wrap" id="f-stock-target"></div>
+    </div>
+
+    <label class="field-label">よくあるもの</label>
+    <div class="chip-groups" id="preset-chips"></div>
+  </div>
+</div>
+
+<!-- ========== 履歴シート（機能B） ========== -->
+<div id="hist-backdrop" class="backdrop" hidden></div>
+<div id="hist-sheet" class="sheet" hidden role="dialog" aria-modal="true">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <span class="btn-text" aria-hidden="true"></span>
+    <strong id="hist-title">これまで</strong>
+    <button id="hist-close" class="btn-text accent">閉じる</button>
+  </div>
+  <div class="sheet-body"><ul id="hist-list" class="hist-list"></ul></div>
+</div>
+
+<!-- ========== 設定シート ========== -->
+<div id="set-backdrop" class="backdrop" hidden></div>
+<div id="set-sheet" class="sheet tall" hidden role="dialog" aria-modal="true">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <span class="btn-text" aria-hidden="true"></span>
+    <strong>設定</strong>
+    <button id="set-close" class="btn-text accent">閉じる</button>
+  </div>
+  <div class="set-tabs" id="set-tabs">
+    <button type="button" data-t="basic" class="is-on">基本</button>
+    <button type="button" data-t="names">名前</button>
+    <button type="button" data-t="shelves">棚</button>
+    <button type="button" data-t="chars">キャラ</button>
+    <button type="button" data-t="notif">通知</button>
+    <button type="button" data-t="share">共有</button>
+    <button type="button" data-t="data">データ</button>
+  </div>
+  <div class="sheet-body" id="set-body"></div>
+</div>
+
+<!-- ========== 認識中 ========== -->
+<div id="recognizing" class="fullscreen" hidden>
+  <img id="recog-char" class="recog-char motion-bob" src="assets/char-star.svg" alt="">
+  <div class="type-h2" id="recog-title">なにがあるかな〜</div>
+  <div class="type-body-sm muted" id="recog-sub">じっくり見ています</div>
+  <div class="skeletons">
+    <i class="motion-shimmer"></i><i class="motion-shimmer"></i><i class="motion-shimmer"></i>
+  </div>
+  <button id="recog-cancel" class="btn-text">やめる</button>
+</div>
+
+<!-- ========== 認識結果のたしかめ ========== -->
+<div id="review" class="fullscreen review" hidden>
+  <div class="review-head">
+    <button id="review-close" class="icon-btn" aria-label="閉じる">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div>
+      <div id="review-title" class="type-h2"></div>
+      <div class="type-body-sm muted">チェックをはずすと入れません</div>
+    </div>
+  </div>
+  <ul id="review-list" class="list"></ul>
+  <div class="review-foot">
+    <button id="review-retry" class="btn-ghost">やりなおす</button>
+    <button id="review-ok" class="btn-primary">入れる</button>
+  </div>
+</div>
+
+<input id="file-shelf" type="file" accept="image/*" capture="environment" hidden>
+<input id="file-receipt" type="file" accept="image/*" capture="environment" hidden>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/data.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

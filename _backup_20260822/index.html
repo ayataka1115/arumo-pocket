@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" id="meta-theme" content="#F1FAF9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ウチの冷蔵庫">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="style.css">
+<title>ウチの冷蔵庫</title>
+</head>
+<body>
+
+<header class="topbar">
+  <h1 id="title">冷蔵庫</h1>
+  <div class="topbar-right">
+    <button id="sync-chip" class="sync-chip" data-state="off" aria-label="同期の状態">
+      <i class="dot"></i><span id="sync-text">この端末だけ</span>
+    </button>
+    <button id="btn-settings" class="icon-btn" aria-label="設定">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+        <circle cx="12" cy="12" r="3.2"/>
+        <path d="M12 2.8v2.4M12 18.8v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M2.8 12h2.4M18.8 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- ========== 冷蔵庫 ========== -->
+  <section id="view-fridge" class="view">
+
+    <div class="hero" id="hero">
+      <img id="hero-img" src="hero.svg" alt="">
+      <div class="hero-scrim"></div>
+      <div class="hero-text">
+        <div class="hero-count" id="hero-count"></div>
+        <div class="hero-note" id="hero-note"></div>
+      </div>
+    </div>
+
+    <div id="urgent" class="urgent" hidden>
+      <svg class="bell" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8.6a6 6 0 1 0-12 0c0 6-2 7.4-2 7.4h16s-2-1.4-2-7.4"/>
+        <path d="M13.7 20a2 2 0 0 1-3.4 0"/>
+      </svg>
+      <div class="urgent-body">
+        <div class="urgent-title" id="urgent-title"></div>
+        <div class="urgent-names" id="urgent-names"></div>
+      </div>
+    </div>
+
+    <div class="listhead">
+      <div id="fridge-summary" class="summary" hidden></div>
+      <button id="sortbtn" class="sortbtn">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 20l-3-3M17 20V4M17 4l3 3"/></svg>
+        <span id="sort-label">期限が近い順</span>
+      </button>
+    </div>
+
+    <ul id="fridge-list" class="list"></ul>
+
+    <div id="fridge-empty" class="empty" hidden>
+      <div class="empty-mark">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">
+          <rect x="5" y="2.6" width="14" height="18.8" rx="3.4"/><path d="M5 10h14M8.4 6.1v1.9M8.4 13v2.5"/>
+        </svg>
+      </div>
+      <p>冷蔵庫はからっぽです。<br>下の「食材を入れる」から追加してください。</p>
+    </div>
+  </section>
+
+  <!-- ========== 買い物 ========== -->
+  <section id="view-shop" class="view" hidden>
+    <form id="shop-quick" class="quick-add">
+      <input id="shop-input" type="text" placeholder="買ってきてほしいもの" enterkeyhint="done" autocomplete="off">
+      <button type="submit" class="btn-primary sm">追加</button>
+    </form>
+    <ul id="shop-list" class="list"></ul>
+    <div id="shop-empty" class="empty" hidden>
+      <div class="empty-mark">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M6 8h12l-1 11.4H7z"/><path d="M9.2 8V6.2a2.8 2.8 0 0 1 5.6 0V8"/>
+        </svg>
+      </div>
+      <p>買い物リストは空です。<br>「切らした」と気づいたときに足しましょう。</p>
+    </div>
+    <div class="list-foot">
+      <button id="btn-clear-done" class="btn-ghost" hidden>買ったものを消す</button>
+    </div>
+  </section>
+</main>
+
+<button id="fab" class="fab">＋ 食材を入れる</button>
+
+<nav class="tabbar">
+  <button class="tab is-active" data-view="fridge">
+    <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="2.6" width="14" height="18.8" rx="3.4"/><path d="M5 10h14M8.4 6.1v1.9M8.4 13v2.5"/></svg>
+    <span>冷蔵庫</span>
+  </button>
+  <button class="tab" data-view="shop">
+    <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"><path d="M6 8h12l-1 11.4H7z"/><path d="M9.2 8V6.2a2.8 2.8 0 0 1 5.6 0V8"/></svg>
+    <span>買い物<i id="shop-badge" class="badge" hidden></i></span>
+  </button>
+</nav>
+
+<!-- ========== 食材追加シート ========== -->
+<div id="sheet-backdrop" class="backdrop" hidden></div>
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <button id="sheet-cancel" class="btn-text">やめる</button>
+    <strong id="sheet-title">食材を入れる</strong>
+    <button id="sheet-save" class="btn-text accent">保存</button>
+  </div>
+  <div class="sheet-body">
+
+    <label class="field-label">品目</label>
+    <input id="f-name" type="text" class="field" placeholder="例：にんじん" autocomplete="off" enterkeyhint="done">
+    <div class="chip-groups" id="preset-chips"></div>
+
+    <label class="field-label">量</label>
+    <div class="qty-row">
+      <button type="button" class="step" data-step="-1" aria-label="減らす">−</button>
+      <output id="f-qty" class="qty-val">1</output>
+      <button type="button" class="step" data-step="1" aria-label="増やす">＋</button>
+    </div>
+    <div class="chip-row" id="qty-chips" style="margin-top:10px"></div>
+    <div class="unit-seg" id="f-unit"></div>
+
+    <label class="field-label">賞味・消費期限</label>
+    <div class="chip-row" id="expiry-chips">
+      <button type="button" class="chip" data-days="3">3日後</button>
+      <button type="button" class="chip" data-days="7">1週間</button>
+      <button type="button" class="chip" data-days="14">2週間</button>
+      <button type="button" class="chip" data-days="30">1か月</button>
+      <button type="button" class="chip" data-days="">なし</button>
+    </div>
+    <input id="f-expiry" type="date" class="field" style="margin-top:9px">
+
+  </div>
+</div>
+
+<!-- ========== 設定シート ========== -->
+<div id="set-backdrop" class="backdrop" hidden></div>
+<div id="set-sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="set-title">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <span class="btn-text" aria-hidden="true"></span>
+    <strong id="set-title">設定</strong>
+    <button id="set-close" class="btn-text accent">閉じる</button>
+  </div>
+  <div class="sheet-body">
+    <label class="field-label">見た目</label>
+    <div class="seg" id="theme-seg">
+      <button type="button" data-theme="auto">端末に合わせる</button>
+      <button type="button" data-theme="light">ライト</button>
+      <button type="button" data-theme="dark">ダーク</button>
+    </div>
+
+    <label class="field-label">自分の名前</label>
+    <input id="f-me" type="text" class="field" placeholder="例：ゆう" autocomplete="off">
+    <p class="hint">買い物リストに「誰が足したか」が残ります。</p>
+
+    <label class="field-label">家族で共有</label>
+    <input id="f-url" type="url" class="field" placeholder="共有URL（.../exec）" autocomplete="off" inputmode="url">
+    <div class="house-row">
+      <input id="f-house" type="text" class="field" placeholder="家族コード" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="btn-make-house" class="btn-ghost">新しく作る</button>
+    </div>
+    <p id="sync-detail" class="hint"></p>
+    <button id="btn-sync-now" class="btn-ghost wide" style="margin-top:10px">今すぐ同期する</button>
+    <p class="hint">共有URLと家族コードが同じ端末どうしが、同じ冷蔵庫・同じ買い物リストになります。<strong>家族コードは合言葉です</strong>。推測されにくいものにしてください。</p>
+
+    <label class="field-label">データ</label>
+    <button id="btn-export" class="btn-ghost wide">バックアップを書き出す</button>
+    <p class="hint">共有を設定していないときは、この端末の中だけに保存されます。</p>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

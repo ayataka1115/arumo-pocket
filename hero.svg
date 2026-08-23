@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" role="img" aria-label="冷蔵庫のイラスト（仮）">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#BFEFEA"/>
+      <stop offset="1" stop-color="#6FD3CC"/>
+    </linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF8F7"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFF6D8" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#FFF6D8" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#2B6E6B" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <rect width="800" height="400" fill="url(#sky)"/>
+
+  <!-- ふわふわの泡 -->
+  <circle cx="92"  cy="82"  r="34" fill="#FFFFFF" opacity=".22"/>
+  <circle cx="148" cy="146" r="19" fill="#FFFFFF" opacity=".18"/>
+  <circle cx="704" cy="104" r="42" fill="#FFFFFF" opacity=".2"/>
+  <circle cx="646" cy="182" r="16" fill="#FFFFFF" opacity=".16"/>
+
+  <!-- 冷蔵庫の本体 -->
+  <g filter="url(#soft)">
+    <rect x="236" y="40" width="328" height="330" rx="42" fill="#FFFFFF"/>
+    <rect x="258" y="62" width="284" height="286" rx="30" fill="url(#inside)"/>
+  </g>
+  <rect x="258" y="62" width="284" height="120" rx="30" fill="url(#glow)"/>
+
+  <!-- 棚 -->
+  <rect x="258" y="168" width="284" height="7" rx="3.5" fill="#CFEBE8"/>
+  <rect x="258" y="262" width="284" height="7" rx="3.5" fill="#CFEBE8"/>
+
+  <!-- 上の棚：牛乳・卵 -->
+  <g>
+    <path d="M300 168V112c0-4 2-7 5-9l16-10 16 10c3 2 5 5 5 9v56z" fill="#FFFDF6" stroke="#DCEEEC" stroke-width="3"/>
+    <rect x="303" y="128" width="36" height="20" rx="6" fill="#9BE5DF"/>
+    <g fill="#FFFFFF" stroke="#E4EFEE" stroke-width="3">
+      <ellipse cx="380" cy="150" rx="17" ry="20"/>
+      <ellipse cx="414" cy="150" rx="17" ry="20"/>
+    </g>
+    <rect x="446" y="118" width="66" height="50" rx="14" fill="#F7D889"/>
+    <rect x="456" y="132" width="46" height="9" rx="4.5" fill="#FFFFFF" opacity=".75"/>
+  </g>
+
+  <!-- 中の棚：にんじん・葉物 -->
+  <g>
+    <path d="M300 262c-4-30 8-52 26-56 6 22-4 48-26 56z" fill="#93DBAE"/>
+    <path d="M318 206c14-8 30-4 36 8 5 12-2 26-16 34-14 8-30 4-36-8-5-12 2-26 16-34z" fill="#F7B27A"/>
+    <path d="M356 214c8-14 22-16 30-8-4 10-16 16-30 8z" fill="#93DBAE"/>
+    <ellipse cx="440" cy="236" rx="30" ry="24" fill="#F7AEB6"/>
+    <ellipse cx="440" cy="228" rx="12" ry="8" fill="#FFFFFF" opacity=".55"/>
+    <rect x="486" y="212" width="42" height="48" rx="13" fill="#BFB6EC"/>
+  </g>
+
+  <!-- 下の棚：いちご・豆腐 -->
+  <g>
+    <g fill="#F58BA0">
+      <path d="M306 300c12 0 20 9 20 20s-9 26-20 26-20-14-20-26 8-20 20-20z"/>
+      <path d="M352 306c11 0 19 8 19 18s-8 24-19 24-19-13-19-24 8-18 19-18z"/>
+    </g>
+    <path d="M296 300c4-8 12-11 20-8-3 7-11 11-20 8z" fill="#93DBAE"/>
+    <rect x="392" y="298" width="72" height="46" rx="12" fill="#FFFDF6" stroke="#DCEEEC" stroke-width="3"/>
+    <rect x="404" y="310" width="48" height="8" rx="4" fill="#CFEBE8"/>
+    <rect x="486" y="292" width="46" height="52" rx="14" fill="#9BE5DF"/>
+  </g>
+
+  <!-- 取っ手 -->
+  <rect x="556" y="120" width="13" height="72" rx="6.5" fill="#FFFFFF" opacity=".9"/>
+  <rect x="556" y="236" width="13" height="72" rx="6.5" fill="#FFFFFF" opacity=".9"/>
+</svg>

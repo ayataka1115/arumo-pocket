@@ -1,0 +1,866 @@
+/* アルノポケット — 画面の見た目
+ * 色・角丸・影・余白の値は css/tokens.css に置いてある。ここでは組み立てだけ。
+ */
+
+:root {
+  --tag-ok:   var(--success);
+  --tag-soon: var(--brand-butter-deep);
+  --tag-over: var(--danger);
+  --shelf-now: var(--brand-mint);
+  --shelf-now-deep: var(--brand-mint-deep);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; }
+
+/* display を持つ部品にも hidden を効かせる（.sheet や .fullscreen は display:flex のため） */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  padding: calc(52px + var(--safe-top)) 0 calc(96px + var(--safe-bottom));
+  background: var(--bg-app);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.75;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+img { max-width: 100%; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; padding: 0; }
+.muted { color: var(--fg-3); }
+h2, h3 { margin: 0; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+
+/* ============ 上のバー ============ */
+.topbar {
+  position: fixed; inset: 0 0 auto 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: calc(var(--safe-top) + 8px) var(--s-4) 8px;
+  background: color-mix(in oklab, var(--bg-app) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.house-chip {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 5px 12px 5px 5px;
+  border-radius: var(--r-pill);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
+  font-weight: 700; font-size: 14px;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.house-chip:active { transform: scale(0.96); }
+.house-initial {
+  width: 26px; height: 26px; border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  background: var(--brand-mint); color: var(--brand-mint-deep);
+  font-style: normal; font-size: 13px; font-weight: 900;
+}
+
+.sync-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--r-pill);
+  background: var(--bg-alt); color: var(--fg-2);
+  font-size: 12px; letter-spacing: 0.02em;
+}
+.sync-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fg-3); }
+.sync-chip[data-state="ok"]      .dot { background: var(--success); }
+.sync-chip[data-state="syncing"] .dot { background: var(--info); animation: bob 1s infinite; }
+.sync-chip[data-state="error"]   .dot { background: var(--danger); }
+
+/* ============ ビュー ============ */
+/* 画面切替は --dur-4(560ms) だと、タブを押すたび0.5秒待たされる感触になっていた。
+ * 「切替は速く」の原則どおり fast(250ms) 相当まで詰める。 */
+.view { padding: 0 var(--s-4); animation: enterUp 250ms var(--ease-smooth-out); }
+.section-head {
+  margin: var(--s-6) 0 var(--s-3);
+  color: var(--fg-3); font-weight: 700;
+  display: flex; align-items: baseline; gap: var(--s-2);
+}
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); }
+
+/* 買うもの画面の下2つは、横に並べると狭い画面で折り返してしまう。縦に積む */
+#view-shop .row-between { flex-direction: column; align-items: stretch; gap: var(--s-2); }
+#view-shop .row-between .btn-text { text-align: center; padding: 10px 4px; }
+.widget-count { color: var(--fg-3); font-weight: 400; }
+.empty { color: var(--fg-3); text-align: center; padding: var(--s-8) var(--s-4); }
+
+/* ============ ヒーロー ============ */
+.hero {
+  position: relative;
+  display: flex; align-items: center; gap: var(--s-4);
+  margin-top: var(--s-4);
+  padding: var(--s-5);
+  border-radius: var(--r-xl);
+  background: linear-gradient(135deg, oklch(0.86 0.08 155 / 0.35), oklch(0.93 0.08 90 / 0.25));
+  overflow: hidden;
+}
+:root[data-theme="dark"] .hero {
+  background: linear-gradient(135deg, oklch(0.62 0.07 155 / 0.30), oklch(0.66 0.08 90 / 0.20));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hero {
+    background: linear-gradient(135deg, oklch(0.62 0.07 155 / 0.30), oklch(0.66 0.08 90 / 0.20));
+  }
+}
+.hero-char { width: 76px; height: 76px; flex: none; }
+.hero-greet {
+  font-family: var(--font-display);
+  font-size: 23px;
+  text-wrap: balance;     /* 折り返すときは左右の行が均等になるように */
+}
+.hero-sub { color: var(--fg-2); margin-top: 2px; }
+
+/* ============ 気になる子たち ============ */
+.widget {
+  margin-top: var(--s-5);
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+.widget-head { margin: 0 0 var(--s-2); color: var(--fg-3); font-weight: 700; display: flex; gap: var(--s-2); }
+.urgent-list li {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 7px 0;
+  border-top: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+.urgent-list li:first-child { border-top: none; }
+.urgent-list img { width: 34px; height: 34px; }
+.u-name { font-weight: 700; font-size: 14px; }
+.u-shelf { color: var(--fg-3); margin-left: auto; }
+
+/* ============ 棚グリッド ============ */
+.shelf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.shelf-tile {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: var(--s-6) var(--s-4) var(--s-4);
+  border-radius: var(--r-xl);
+  background: var(--bg-card);
+  border: 3px solid var(--border-soft);
+  box-shadow: 0 var(--lift-sm) 0 var(--edge-soft), var(--shadow-sm);
+  text-align: left;
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.shelf-tile:active { transform: translateY(var(--lift-sm)); box-shadow: 0 0 0 var(--edge-soft); }
+.shelf-tile .stripe { position: absolute; inset: 0 0 auto 0; height: 11px; background: var(--c); }
+.shelf-tile img { width: 44px; height: 44px; }
+.tile-name { font-size: 16px; font-weight: 700; }
+.tile-count { color: var(--fg-3); }
+.tile-badge {
+  position: absolute; top: 12px; right: 10px;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--danger); color: #fff;
+  font-style: normal; font-size: 11px; font-weight: 700;
+  display: grid; place-items: center;
+}
+.shelf-tile.is-add {
+  align-items: center; justify-content: center;
+  border: 1.5px dashed var(--sand); background: transparent; box-shadow: none;
+  color: var(--fg-3); font-size: 13px; min-height: 104px;
+}
+
+/* ============ 棚の中 ============ */
+.shelf-head { display: flex; align-items: center; gap: var(--s-3); margin: var(--s-4) 0 var(--s-4); }
+.shelf-head-icon { width: 38px; height: 38px; }
+.shelf-head-text .type-h2 { font-family: var(--font-display); }
+.icon-btn {
+  width: 38px; height: 38px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--r-pill); background: var(--bg-alt); color: var(--fg-2);
+}
+
+.camera-btn {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: var(--s-2);
+  /* 画面の1/6を占めていたので詰める。文字は淡い面に淡い色が載って 1.6:1 しか
+   * 出ていなかったため、同系色のまま黒を混ぜて濃くする（面の色は変えない）。 */
+  padding: 13px 20px;
+  border-radius: var(--r-pill);
+  background: var(--shelf-now);
+  color: color-mix(in oklab, var(--shelf-now-deep) 55%, var(--ink));
+  font-weight: 700; font-size: 17px;
+  box-shadow: 0 var(--lift) 0 var(--shelf-now-deep), var(--shadow-mint);
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+}
+.camera-btn:active {
+  transform: translateY(var(--lift));
+  box-shadow: 0 0 0 var(--shelf-now-deep);
+}
+
+/* ============ カード ============ */
+.list { display: flex; flex-direction: column; gap: 10px; margin-top: var(--s-4); }
+
+.card {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: 14px 12px;
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  border: 3px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+.card .stripe { position: absolute; inset: 0 0 auto 0; height: 9px; }
+.card.is-urgent { border-color: color-mix(in oklab, var(--danger) 45%, var(--border-soft)); }
+.card.is-enter { animation: enterUp var(--dur-3) var(--ease-out) both; }
+.card.is-leaving { animation: leaveOut var(--dur-2) var(--ease-in-out) both; }
+.card-char { width: 44px; height: 44px; flex: none; }
+.card-main { flex: 1; min-width: 0; }
+.card-name { font-weight: 700; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 「あと3日」「目標1個」が語の途中で折り返して「あと3／日」になっていた。
+ * 各札は割らずに1つの塊として扱い、入りきらない分は目標のほうから省く
+ * （期限は必ず出す。目標は無くても困らない）。 */
+.card-sub { display: flex; align-items: center; gap: 5px; margin-top: 1px; min-width: 0; }
+.card-sub > * { white-space: nowrap; }
+.card-sub .tag { flex: 0 0 auto; }
+.card-sub .muted { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.card-badge {
+  position: absolute; top: 11px; right: 11px;
+  padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--danger); color: #fff;
+  font-style: normal; font-size: 10px; font-weight: 700;
+}
+.card-side { display: flex; flex-direction: column; gap: 4px; }
+.card.is-done { opacity: 0.5; }
+.card.is-done .card-name { text-decoration: line-through; }
+
+.tag { font-size: 11px; font-weight: 700; }
+.tag.ok   { color: var(--fg-3); }
+.tag.soon { color: var(--brand-butter-deep); }
+.tag.over { color: var(--danger); }
+
+/* gap 2px だと「1パック」のような長い値が±ボタンに貼り付いて見えた */
+.card-qty { display: flex; align-items: center; gap: 5px; flex: none; }
+.qbtn {
+  width: 38px; height: 38px; border-radius: var(--r-pill);
+  background: var(--bg-alt); color: var(--fg-2);
+  font-size: 21px; font-weight: 700; line-height: 1;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.qbtn { box-shadow: 0 var(--lift-sm) 0 var(--edge-soft); }
+.qbtn:active { transform: translateY(var(--lift-sm)); box-shadow: 0 0 0 var(--edge-soft); }
+.qnum { min-width: 46px; text-align: center; font-weight: 500; display: inline-block; }
+
+.dots { display: flex; gap: 4px; padding: 6px; cursor: pointer; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--sand); transition: background var(--dur-2); }
+.dots i.on { background: var(--shelf-now-deep); }
+
+.mini {
+  width: 34px; height: 34px; border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  background: var(--bg-alt); color: var(--fg-3);
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.mini { box-shadow: 0 2px 0 var(--edge-soft); }
+.mini:active { transform: translateY(2px); box-shadow: 0 0 0 var(--edge-soft); }
+.mini.wide { width: auto; padding: 0 12px; font-size: 12px; font-weight: 700; color: var(--fg-2); }
+
+.check {
+  width: 34px; height: 34px; flex: none;
+  border-radius: var(--r-pill);
+  border: 3px solid var(--sand);
+  display: grid; place-items: center;
+  color: transparent;
+  transition: background var(--dur-2) var(--ease-soft),
+              border-color var(--dur-2) var(--ease-soft),
+              color var(--dur-2) var(--ease-soft);
+}
+.card.is-done .check, .check.is-on {
+  background: var(--brand-mint-deep); border-color: var(--brand-mint-deep); color: var(--on-accent);
+}
+
+/* ============ 進み具合バー ============
+ * 「あと2品」を数字で言うより、減っていくバーのほうが手応えがある */
+.progress {
+  display: flex; align-items: center; gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.progress-bar {
+  flex: 1; height: 24px;
+  border-radius: var(--r-pill);
+  background: var(--bg-alt);
+  border: 3px solid var(--border-soft);
+  overflow: hidden;
+}
+.progress-bar b {
+  display: block; height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--brand-mint-deep);
+  transition: width var(--dur-reveal) var(--ease-soft);
+}
+.progress-face { width: 38px; height: 38px; flex: none; }
+.progress-text { font-family: var(--font-mono); font-size: 12px; color: var(--fg-3); flex: none; }
+.progress.is-done .progress-bar b { background: var(--success); }
+
+/* ============ 達成のときに弾ける粒 ============ */
+.burst { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.burst i {
+  position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  animation: burstOut 900ms var(--ease-out) forwards;
+}
+.burst i.sq { border-radius: 4px; }
+
+/* ============ 買うもの・ことづて ============ */
+.quick-add { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
+.quick-add input {
+  flex: 1; min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--bg-alt);
+  border: 1px solid transparent;
+  outline: none;
+}
+.quick-add input:focus { border-color: var(--brand-mint-deep); box-shadow: 0 0 0 3px oklch(0.86 0.08 155 / 0.5); }
+
+.chat-panel {
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+.chat-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--s-3); }
+.msg {
+  align-self: flex-start; max-width: 84%;
+  display: flex; flex-direction: column;
+  padding: 8px 12px;
+  border-radius: var(--r-md) var(--r-md) var(--r-md) 6px;
+  background: var(--bg-alt);
+}
+.msg.mine {
+  align-self: flex-end;
+  border-radius: var(--r-md) var(--r-md) 6px var(--r-md);
+  background: var(--brand-mint); color: var(--brand-mint-deep);
+}
+.msg-by { color: var(--fg-3); }
+.msg.mine .msg-by, .msg.mine .msg-at { color: color-mix(in oklab, var(--brand-mint-deep) 75%, transparent); }
+.msg-body { font-size: 14px; line-height: 1.5; }
+.msg-at { align-self: flex-end; color: var(--fg-3); }
+.msg-empty { align-self: center; }
+.chat-stamps { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s-2); }
+
+/* ============ レシピ ============ */
+.recipe-list { display: flex; flex-direction: column; gap: var(--s-3); }
+.recipe {
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+.recipe-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; margin-bottom: var(--s-2); }
+
+/* 「あるもので作れる」か「買い足すと作れる」かを、開いた瞬間に分からせる帯 */
+.recipe-flag {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-bottom: var(--s-2);
+  padding: 5px 12px 5px 6px;
+  border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+}
+.recipe-flag img { width: 20px; height: 20px; }
+.recipe[data-kind="asis"] .recipe-flag { background: var(--brand-mint); color: var(--brand-mint-deep); }
+.recipe[data-kind="plus"] .recipe-flag { background: var(--brand-butter); color: var(--brand-butter-deep); }
+.recipe[data-kind="asis"] { border-color: color-mix(in oklab, var(--brand-mint-deep) 30%, var(--border-soft)); }
+.recipe-note { color: var(--fg-2); margin: 0 0 var(--s-2); }
+.recipe-sec { margin-top: var(--s-3); }
+.recipe-steps ol { list-style: decimal; padding-left: 1.3em; margin-top: var(--s-2); font-size: 14px; }
+.recipe-steps li { margin-bottom: 4px; }
+.recipe-foot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-3); }
+.chip.is-have { background: var(--brand-mint); color: var(--brand-mint-deep); border-color: transparent; }
+.chip.is-buy  { background: var(--brand-pink); color: var(--brand-pink-deep); border-color: transparent; }
+.chip.is-flat { background: var(--bg-alt); color: var(--fg-2); border-color: transparent; }
+.chip img { width: 18px; height: 18px; }
+
+/* ============ 分析 ============ */
+.stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-card {
+  padding: var(--s-4) var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--c); color: var(--cd);
+  text-align: center;
+}
+.stat-n { font-family: var(--font-mono); font-weight: 500; }
+.stat-shelves { display: flex; flex-direction: column; gap: var(--s-3); }
+.stat-row { display: grid; grid-template-columns: 24px 1fr auto; gap: var(--s-2); align-items: center; }
+.stat-row img { width: 24px; height: 24px; }
+.stat-name { font-size: 14px; font-weight: 500; }
+.stat-row .bar { grid-column: 1 / -1; height: 8px; border-radius: var(--r-pill); background: var(--bg-alt); overflow: hidden; }
+.stat-row .bar b { display: block; height: 100%; border-radius: var(--r-pill); }
+.stat-rank li { display: flex; align-items: center; gap: var(--s-3); padding: 9px 0; border-top: 1px solid var(--border-soft); }
+.stat-rank li:first-child { border-top: none; }
+.stat-rank b { margin-left: auto; color: var(--fg-3); font-weight: 500; }
+.rank {
+  width: 24px; height: 24px; border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  background: var(--bg-alt); color: var(--fg-3); font-style: normal;
+}
+.stat-rank li.top .rank { background: var(--brand-butter); color: var(--brand-butter-deep); font-weight: 700; }
+
+/* ============ ボタン・入力 ============ */
+/* ボタンは「板」ではなく「厚みのある物体」にする。
+ * 下に側面（--lift ぶんの実色）を置き、押すとその高さだけ本当に沈む。 */
+.btn-primary {
+  padding: 16px 28px; font-size: 17px; border-radius: var(--r-pill);
+  background: var(--brand-pink-deep); color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: 0 var(--lift) 0 var(--edge-pink), var(--shadow-pink);
+  transform: translateY(0);
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+}
+.btn-primary.sm { padding: 10px 18px; font-size: 14px; }
+.btn-primary:active {
+  transform: translateY(var(--lift));
+  box-shadow: 0 0 0 var(--edge-pink);
+}
+.btn-primary:disabled { opacity: 0.45; box-shadow: 0 var(--lift) 0 var(--edge-pink); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 14px 20px; border-radius: var(--r-pill);
+  background: var(--bg-card); color: var(--fg-2);
+  border: 1px solid var(--border-soft);
+  font-size: 14px; font-weight: 500;
+  transition: transform var(--dur-1) var(--ease-out), background var(--dur-2);
+}
+.btn-ghost.sm { padding: 8px 14px; font-size: 13px; }
+.btn-ghost.wide { width: 100%; margin-top: var(--s-2); }
+.btn-ghost { box-shadow: 0 var(--lift-sm) 0 var(--edge-soft); }
+.btn-ghost:active {
+  transform: translateY(var(--lift-sm));
+  box-shadow: 0 0 0 var(--edge-soft);
+  background: var(--bg-alt);
+}
+
+.btn-text { padding: 8px 4px; color: var(--fg-3); font-size: 14px; }
+.btn-text.accent { color: var(--brand-pink-deep); font-weight: 700; }
+
+.field {
+  width: 100%; padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--bg-alt);
+  border: 1px solid transparent;
+  outline: none;
+}
+.field:focus { border-color: var(--brand-mint-deep); box-shadow: 0 0 0 3px oklch(0.86 0.08 155 / 0.5); }
+.field.flat { background: transparent; border-radius: var(--r-sm); padding: 8px 10px; }
+.field-label { display: block; margin: var(--s-5) 0 var(--s-2); color: var(--fg-3); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
+.hint { margin: var(--s-2) 0 0; color: var(--fg-3); }
+.row-tight { display: flex; gap: var(--s-2); }
+.row-tight .field { flex: 1; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 11px 17px; border-radius: var(--r-pill);
+  background: var(--bg-card); color: var(--fg-2);
+  border: 1px solid var(--border-soft);
+  font-size: 13px;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.chip { box-shadow: 0 2px 0 var(--edge-soft); }
+.chip:active { transform: translateY(2px); box-shadow: 0 0 0 var(--edge-soft); }
+.chip.is-on { background: var(--brand-mint); color: var(--brand-mint-deep); border-color: transparent; font-weight: 700; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-row.tight { gap: 5px; margin-top: 5px; }
+.chip-groups { display: flex; flex-direction: column; gap: var(--s-3); }
+.chip-group-name { margin: var(--s-3) 0 5px; color: var(--fg-3); font-weight: 700; }
+
+.seg { position: relative; display: flex; gap: 4px; padding: 4px; border-radius: var(--r-pill); background: var(--bg-alt); }
+.seg.wrap { flex-wrap: wrap; border-radius: var(--r-md); }
+.seg button {
+  flex: 1; min-width: 64px; padding: 9px 10px;
+  border-radius: var(--r-pill); color: var(--fg-3); font-size: 13px;
+  /* all にすると font-weight まで遷移対象になり、字幅がにじむ */
+  transition: background var(--dur-2) var(--ease-out),
+              color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+.seg button.is-on { background: var(--bg-card); color: var(--fg-1); font-weight: 700; box-shadow: var(--shadow-xs); }
+.seg button { position: relative; z-index: 1; }
+
+/* 1行の切替（ぜんぶ／不足、見た目、など）は、白い面が飛ばずに滑って移る。
+ * 面はこのピルが持つので、選択中のボタン側の背景は消す。
+ * 折り返す .seg.wrap（単位・残量の選択）は行をまたぐので、従来どおり面を直に付ける。 */
+.seg:not(.wrap) > .seg-pill {
+  position: absolute; top: 4px; bottom: 4px; left: 0;
+  border-radius: var(--r-pill);
+  background: var(--bg-card); box-shadow: var(--shadow-xs);
+  z-index: 0; pointer-events: none;
+  transition: transform var(--dur-2) var(--ease-smooth-out), width var(--dur-2) var(--ease-smooth-out);
+}
+.seg:not(.wrap) > .seg-pill.no-anim { transition: none; }
+.seg:not(.wrap):has(> .seg-pill) button.is-on { background: transparent; box-shadow: none; }
+.tabs2 { margin-top: var(--s-4); }
+
+/* ＋入れる が浮かなくなったので、タブバーぶんの余白だけでよい */
+#view-shelf { padding-bottom: 24px; }
+
+.qty-row { display: flex; align-items: center; justify-content: center; gap: var(--s-5); }
+.step {
+  width: 58px; height: 58px; border-radius: var(--r-pill);
+  background: var(--bg-alt); color: var(--fg-2);
+  font-size: 28px; line-height: 1;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.step { box-shadow: 0 var(--lift) 0 var(--edge-soft); }
+.step:active { transform: translateY(var(--lift)); box-shadow: 0 0 0 var(--edge-soft); }
+.qty-val { font-family: var(--font-mono); font-size: 38px; min-width: 96px; text-align: center; display: inline-block; }
+
+.swatch { width: 34px; height: 34px; border-radius: var(--r-pill); border: 3px solid transparent; }
+.swatch.is-on { border-color: var(--fg-1); }
+.icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 6px; }
+.icon-pick {
+  aspect-ratio: 1; display: grid; place-items: center;
+  border-radius: var(--r-md); background: var(--bg-alt);
+  border: 2px solid transparent;
+}
+.icon-pick img { width: 26px; height: 26px; }
+.icon-pick.is-on { border-color: var(--brand-mint-deep); background: var(--brand-mint); }
+
+.switch-list li, .member-list li, .shelf-edit-list li {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 9px 0; border-top: 1px solid var(--border-soft);
+}
+.switch-list li:first-child, .member-list li:first-child, .shelf-edit-list li:first-child { border-top: none; }
+.switch-list img, .shelf-edit-list img { width: 26px; height: 26px; }
+.switch-list span, .shelf-edit-list .field { flex: 1; }
+.switch {
+  width: 46px; height: 27px; border-radius: var(--r-pill);
+  background: var(--sand); position: relative;
+  transition: background var(--dur-2) var(--ease-out);
+}
+.switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 21px; height: 21px; border-radius: 50%;
+  background: #fff; box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-2) var(--ease-soft);
+}
+.switch.is-on { background: var(--brand-mint-deep); }
+.switch.is-on::after { transform: translateX(19px); }
+.member-dot { width: 28px; height: 28px; border-radius: var(--r-pill); flex: none; }
+.editor { padding-bottom: var(--s-6); }
+
+/* ============ FAB・タブバー ============ */
+/* 入れ方の2つを横に並べる。写真のほうが主なので広く取る。 */
+.shelf-actions { display: flex; gap: var(--s-2); align-items: stretch; }
+.shelf-actions .camera-btn { flex: 1 1 auto; width: auto; }
+.shelf-actions .fab { flex: 0 0 auto; }
+
+/* 以前は画面に浮いていて、静止しているあいだ品目の行を覆っていた。
+ * 浮かせるのをやめたので、隠す・戻すの制御もろとも不要になった。 */
+.fab {
+  padding: 13px 18px; font-size: 16px; border-radius: var(--r-pill);
+  background: var(--brand-pink-deep); color: var(--on-accent);
+  font-weight: 700; white-space: nowrap;
+  box-shadow: 0 var(--lift-sm) 0 var(--edge-pink), var(--shadow-pink);
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-1) var(--ease-out);
+}
+.fab:active {
+  transform: translateY(var(--lift-sm));
+  box-shadow: 0 0 0 var(--edge-pink);
+}
+
+.tabbar {
+  position: fixed; inset: auto 0 0 0; z-index: 30;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 6px 4px calc(var(--safe-bottom) + 6px);
+  background: color-mix(in oklab, var(--bg-app) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-top: 1px solid var(--border-soft);
+}
+.tab {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 6px 0; color: var(--fg-3); font-size: 11px;
+  transition: color var(--dur-2);
+  position: relative;
+}
+.tab.is-active { color: var(--brand-mint-deep); }
+.tab .badge {
+  position: absolute; top: 2px; right: 24%;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: var(--r-pill); background: var(--danger); color: #fff;
+  font-style: normal; font-size: 10px; font-weight: 700;
+  display: grid; place-items: center;
+}
+
+/* ============ シート ============ */
+.backdrop {
+  position: fixed; inset: 0; z-index: 40; background: oklch(0.2 0.02 70 / 0.42);
+  animation: fadeIn var(--dur-3) var(--ease-smooth-out) both;
+}
+.backdrop.is-closing { animation: fadeOut var(--dur-2) var(--ease-smooth-out) both; }
+.sheet {
+  position: fixed; z-index: 41; inset: auto 0 0 0;
+  max-height: 88vh; display: flex; flex-direction: column;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  background: var(--bg-app);
+  box-shadow: var(--shadow-lg);
+  animation: sheetUp var(--dur-reveal) var(--ease-smooth-out) both;
+}
+.sheet.is-closing { animation: sheetDown var(--dur-2) var(--ease-smooth-out) both; }
+.sheet.tall { height: 88vh; }
+.sheet-grab { width: 38px; height: 4px; border-radius: var(--r-pill); background: var(--sand); margin: 8px auto 0; flex: none; }
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--border-soft);
+  flex: none;
+}
+.sheet-head strong { font-size: 15px; }
+.sheet-body { overflow-y: auto; padding: 0 var(--s-4) calc(var(--safe-bottom) + var(--s-8)); -webkit-overflow-scrolling: touch; }
+.set-tabs { display: flex; gap: 4px; overflow-x: auto; padding: var(--s-2) var(--s-4); flex: none; border-bottom: 1px solid var(--border-soft); }
+.set-tabs button {
+  flex: none; padding: 7px 14px; border-radius: var(--r-pill);
+  background: var(--bg-alt); color: var(--fg-3); font-size: 13px;
+}
+.set-tabs button.is-on { background: var(--brand-mint); color: var(--brand-mint-deep); font-weight: 700; }
+
+.hist-list li { display: flex; flex-wrap: wrap; gap: 4px var(--s-2); padding: 10px 0; border-top: 1px solid var(--border-soft); font-size: 14px; }
+.hist-list li:first-child { border-top: none; }
+.hist-when { color: var(--fg-3); }
+.hist-who { font-weight: 700; }
+
+/* ============ 全画面（認識中・たしかめ） ============ */
+.fullscreen {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-3);
+  padding: var(--s-6);
+  background: var(--bg-app);
+  animation: fadeIn var(--dur-2) var(--ease-smooth-out) both;
+}
+.fullscreen.is-closing { animation: fadeOut var(--dur-2) var(--ease-smooth-out) both; }
+.recog-char { width: 124px; height: 124px; }
+.skeletons { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; margin-top: var(--s-4); }
+.skeletons i { height: 46px; border-radius: var(--r-md); }
+
+.review { justify-content: flex-start; align-items: stretch; padding: calc(var(--safe-top) + var(--s-5)) var(--s-4) 0; }
+.review-head { display: flex; align-items: center; gap: var(--s-3); flex: none; }
+.review-head .type-h2 { font-family: var(--font-display); }
+.review .list { flex: 1; overflow-y: auto; padding-bottom: var(--s-6); }
+.review-foot {
+  flex: none; display: flex; gap: var(--s-3); align-items: center; justify-content: space-between;
+  padding: var(--s-3) 0 calc(var(--safe-bottom) + var(--s-4));
+  border-top: 1px solid var(--border-soft);
+}
+.review-foot .btn-primary { flex: 1; }
+
+/* ============ フキダシ・トースト ============ */
+.mood {
+  position: fixed; z-index: 35;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 78px);   /* タブバーのすぐ上。中ほどに浮くとカードを覆っていた */
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 9px 16px 9px 9px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-md);
+  max-width: calc(100% - 32px);
+}
+.mood[data-ease="joy"]   { background: var(--brand-mint);     color: var(--brand-mint-deep); }
+.mood[data-ease="sorry"] { background: var(--brand-sky);      color: var(--brand-sky-deep); }
+.mood[data-ease="quiet"] { background: var(--brand-lavender); color: var(--brand-lavender-deep); }
+.mood-char { width: 44px; height: 44px; flex: none; }
+
+.toast {
+  position: fixed; z-index: 60;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 78px);   /* フキダシと同じ場所。両方は出さない（js側で片方を閉じる） */
+  max-width: calc(100% - 32px);
+  padding: 11px 18px; border-radius: var(--r-pill);
+  background: var(--ink); color: var(--milk);
+  font-size: 13px; box-shadow: var(--shadow-lg);
+  animation: pop 320ms var(--ease-soft);
+}
+
+
+/* ============ 派手さの底上げ ============ */
+.tab svg { width: 26px; height: 26px; }
+.tab.is-active svg { animation: hop 520ms var(--ease-soft); }
+.card { transition: transform var(--dur-1) var(--ease-out); }
+.card:active { transform: scale(0.985); }
+.section-head { font-size: 14px; }
+.shelf-head-icon { width: 48px; height: 48px; }
+.house-initial { width: 32px; height: 32px; font-size: 15px; }
+.house-chip { font-size: 15px; }
+.recipe-title { font-size: 21px; }
+.stat-card { padding: var(--s-5) var(--s-3); }
+.recipe-flag { font-size: 13px; padding: 7px 15px 7px 7px; }
+.recipe-flag img { width: 24px; height: 24px; }
+
+
+/* ============ 幅の取り合いを整える ============
+ * 派手にした結果、375px幅で「1000ml」が＋−ボタンに食い込んだ。
+ * 押しやすさは残しつつ、数字に必要な幅を確保する。 */
+.card { padding: 14px 10px; gap: var(--s-2); }
+.card-char { width: 40px; height: 40px; }
+.qbtn { width: 34px; height: 34px; font-size: 19px; }
+.qnum {
+  /* 62px は余らせすぎだった。いちばん長い実データ（1000ml / 1パック）で実測51px なので
+   * 54px で足り、浮いた8pxを品名側（目標が「…」で切れていた）に回す。 */
+  min-width: 54px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.card-side .mini { width: 32px; height: 32px; }
+.card-main { flex: 1 1 auto; min-width: 0; }
+.card-qty { flex: 0 0 auto; }
+
+
+/* ============ 動きの移植（yui540/css-animations より） ============
+ * 出典: https://github.com/yui540/css-animations  MIT License, Copyright (c) 2026 yui540
+ *   ① 2026-06-07/tips-1.html「いいねアニメーション1」→ .pop-fx（チェックしたときの演出）
+ *   ② 2026-04-25/tips-4.html「波紋」                → .ripple（タップの手ごたえ）
+ *   ③ 2026-05-02/tips-3.html「棒グラフ」の chart-up  → bar-grow（分析のバーが伸びる）
+ *
+ * 元は単体のデモページなので、こちらに合わせて3点だけ直してある。
+ *   - 直値の色（#fe5064 など）は tokens.css の変数に置き換えた
+ *   - ②は infinite だったのを、触った1回だけの再生にした
+ *   - keyframes 名は既存と衝突しないよう接頭辞を付けた（元: circle-anim / move / fade-in-out）
+ * 動きを止める設定のときは tokens.css の prefers-reduced-motion が全部を無効にする。
+ * ============================================================== */
+
+/* ---- ① チェックの演出：輪がひろがって、粒が飛ぶ ---- */
+.pop-fx { position: fixed; z-index: 70; width: 0; height: 0; pointer-events: none; }
+
+.pop-ring {
+  position: absolute; top: 50%; left: 50%;
+  width: 78px; height: 78px; margin: -39px 0 0 -39px;
+  border-radius: 50%;
+  border: solid 2px var(--brand-mint-deep);
+  animation: popRing 700ms cubic-bezier(0, 0.06, 0.29, 1) both;
+}
+@keyframes popRing {
+  from     { opacity: 0;    transform: scale(0.15); }
+  50%, 80% { opacity: 0.45; }
+  to       { opacity: 0;    transform: scale(1); }
+}
+
+.pop-dot {
+  position: absolute; top: 50%; left: 50%;
+  width: var(--size, 5px); height: var(--size, 5px);
+  margin: calc(var(--size, 5px) / -2) 0 0 calc(var(--size, 5px) / -2);
+  border-radius: 50%;
+  animation: popMove 650ms cubic-bezier(0.63, -0.01, 0.29, 1) var(--d, 0s) both;
+}
+/* 飛びながら、ふくらんで、しぼんで消える。二重にかけるのが元ネタの肝 */
+.pop-dot::before {
+  content: ""; display: block; width: 100%; height: 100%;
+  border-radius: inherit;
+  background: var(--c, var(--brand-pink-deep));
+  animation:
+    popIn  400ms var(--ease-out) var(--d, 0s) both,
+    popOut 400ms var(--ease-out) calc(550ms + var(--d, 0s)) forwards;
+}
+@keyframes popMove {
+  from { opacity: 0; transform: rotate(var(--rotate, 0deg)) translateY(0); }
+  to   { opacity: 1; transform: rotate(var(--rotate, 0deg)) translateY(var(--travel, -34px)); }
+}
+@keyframes popIn  { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes popOut { from { transform: scale(1); } to { transform: scale(0); } }
+
+/* ---- ② 波紋：触った点から、その部品のいちばん遠い角まで広がる ---- */
+.qbtn, .mini { position: relative; overflow: hidden; }
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--rip, currentColor);
+  pointer-events: none;
+  animation: tapRipple var(--dur-reveal) var(--ease-smooth-out) both;
+}
+/* 元は infinite で 1.6秒かけて薄れる形だったが、そのままだと
+ * タップ用の 0.6秒では最初の 0.2秒で消えてしまい、指の下で何も見えなかった。
+ * 広がりきるまで濃さを保ち、そのあとで引く形に変えている。 */
+@keyframes tapRipple {
+  from { opacity: 0.24; transform: scale(0); }
+  45%  { opacity: 0.24; }
+  to   { opacity: 0;    transform: scale(1); }
+}
+/* 棚カードは、その棚の色で波紋が立つ（--cd はタイル側でインライン指定済み）。
+ * 棚の中の丸ボタンも、開いている棚の色に合わせる。既定の currentColor だと
+ * ミニボタンが灰色（--fg-3）で、生成りの地の上ではほとんど見えなかった。 */
+.shelf-tile { --rip: var(--cd); }
+#shelf-list .qbtn, #shelf-list .mini { --rip: var(--shelf-now-deep); }
+
+/* ---- ③ 分析のバー：伸びきる手前で少し行きすぎて、戻って落ち着く ---- */
+.stat-row.is-grow .bar b { animation: barGrow var(--dur-reveal) var(--ease-smooth-out) var(--d, 0s) both; }
+@keyframes barGrow {
+  from { width: 0; }
+  60%  { width: calc(var(--w) * 1.08); }
+  to   { width: var(--w); }
+}
+
+
+/* ---- フキダシとトーストの閉じ ---- */
+.mood.is-closing, .toast.is-closing { animation: slipOut var(--dur-2) var(--ease-in-out) both; }
+
+/* ---- 買うものバッジ ----
+ * hidden の付け外しだけで、増えても目に入らなかった。数が変わったときに一度だけ弾ませる。 */
+.tab .badge.is-pop { animation: badgePop var(--dur-emphasis) var(--ease-smooth-out) both; }
+@keyframes badgePop {
+  from { opacity: 0; transform: translate(8px, -8px) scale(0.4); }
+  60%  { opacity: 1; transform: translate(0, 0) scale(1.25); }
+  to   { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+
+/* ---- 何も無いときの見せ方 ----
+ * 文字だけだと寂しく、他の画面にはキャラがいるのにここだけ居なかった。 */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-3);
+  padding: var(--s-8) var(--s-4);
+  text-align: center; color: var(--fg-3);
+}
+.empty-char { width: 84px; height: 84px; }
+
+/* 入力欄と隣のボタンの高さが揃っていなかった（欄は上下12px、ボタンは別の余白） */
+.quick-add { align-items: stretch; }
+.quick-add input { padding: 12px 14px; }
+.quick-add .btn-primary.sm { display: grid; place-items: center; padding: 0 18px; }
+
+
+/* ---- 骨組み（認識中のシマー）から中身への差し替え ----
+ * それまで結果がパッと入れ替わっていて、待っていたものが出てきた感じがしなかった。
+ * ぼかしを薄く重ねて、像が結ぶように出す。並ぶものは 40ms ずつずらす。 */
+#review-list.is-revealing .card { animation: skelReveal var(--dur-reveal) var(--ease-in-out) var(--d, 0s) both; }
+@keyframes skelReveal {
+  from { opacity: 0; filter: blur(2px); transform: translateY(6px) scale(0.99); }
+  to   { opacity: 1; filter: blur(0);   transform: none; }
+}
+
+
+/* 本家サイトへの検索リンク。押せるものと分かるよう、下線ではなく枠で示す */
+.chip.is-link {
+  text-decoration: none;
+  color: var(--brand-pink-deep);
+  border-color: color-mix(in oklab, var(--brand-pink-deep) 35%, var(--border-soft));
+  font-weight: 700;
+}
+.chip.is-link:active { transform: translateY(1px); }
+
+
+/* 食材から直接レシピを探す行。1食材＝1行に収める（3サイト分が折り返すと画面を食い潰す） */
+.from-food-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.from-food-row:first-child { border-top: none; }
+.from-food-row img { width: 26px; height: 26px; flex: none; }
+.ff-name {
+  font-weight: 700; font-size: 14px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.from-food-row .tag { flex: none; }
+.from-food-row .chip-row { margin-left: auto; flex: none; flex-wrap: nowrap; gap: 4px; }
+.chip.is-link.sm { padding: 5px 9px; font-size: 11px; }

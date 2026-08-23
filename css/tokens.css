@@ -1,0 +1,257 @@
+/* アルノポケット — デザイントークン
+ * 値は design_handoff_arumo_pocket/README.md の定義をそのまま写している。
+ * 色を変えたいときは、このファイルの :root だけを触れば全画面に伝わる。
+ */
+
+:root {
+  /* ---- ブランド色 ---- */
+  --brand-mint:        oklch(0.86 0.08 155);
+  --brand-mint-deep:   oklch(0.72 0.11 158);
+  --brand-pink:        oklch(0.88 0.07 25);
+  --brand-pink-deep:   oklch(0.72 0.13 22);
+  --brand-butter:      oklch(0.93 0.08 90);
+  --brand-butter-deep: oklch(0.82 0.14 85);
+  --brand-lavender:    oklch(0.88 0.06 305);
+  --brand-sky:         oklch(0.90 0.06 230);
+  --brand-peach:       oklch(0.90 0.08 55);
+  /* この3色には -deep が無く、載せる文字を各所で直値で書いていた（.mood など）。
+   * 面と文字を必ず対で持たせるため、ここに集約する。 */
+  --brand-lavender-deep: oklch(0.45 0.11 300);
+  --brand-sky-deep:      oklch(0.45 0.11 235);
+  --brand-peach-deep:    oklch(0.55 0.14 50);
+
+  /* -deep を「面」に使うボタン（.btn-primary / .fab / .check）に載せる文字の色。
+   * ダークでは -deep が明るくなるので、白のままだと読めなくなる。 */
+  --on-accent: #fff;
+
+  /* ---- 無彩色（あたたかい生成り） ---- */
+  --milk:     oklch(0.985 0.005 85);
+  --cream:    oklch(0.96  0.012 85);
+  --sand:     oklch(0.92  0.015 80);
+  --stone:    oklch(0.78  0.012 80);
+  --charcoal: oklch(0.35  0.015 75);
+  --ink:      oklch(0.22  0.015 60);
+
+  /* 役割名（画面側はこちらを使う） */
+  --bg-app:     var(--milk);
+  --bg-card:    #fff;
+  --bg-alt:     var(--cream);
+  --border-soft: var(--sand);
+  --fg-1:       var(--ink);
+  --fg-2:       var(--charcoal);
+  --fg-3:       var(--stone);
+
+  /* ---- 意味を持つ色 ---- */
+  --success: oklch(0.72 0.13 155);
+  --warning: oklch(0.78 0.16 75);
+  --danger:  oklch(0.66 0.19 25);
+  --info:    oklch(0.72 0.11 235);
+
+  /* ---- 角丸（"むにっ" 感の要） ---- */
+  --r-xs: 6px;  --r-sm: 10px; --r-md: 16px;
+  --r-lg: 22px; --r-xl: 28px; --r-2xl: 36px;
+  --r-pill: 999px;
+
+  /* ---- 影（純黒は使わずオリーブ寄りグレー） ---- */
+  --shadow-xs:   0 1px 2px  oklch(0.5 0.02 80 / 0.06);
+  --shadow-sm:   0 2px 6px  oklch(0.5 0.02 80 / 0.08);
+  --shadow-md:   0 6px 18px oklch(0.5 0.03 80 / 0.10);
+  --shadow-lg:   0 14px 32px oklch(0.5 0.04 80 / 0.13);
+  --shadow-mint: 0 8px 24px oklch(0.72 0.11 158 / 0.25);
+  --shadow-pink: 0 8px 24px oklch(0.72 0.13 22 / 0.22);
+
+  /* ---- ボタンの「厚み」の色（押すと沈む表現に使う） ----
+   * 影ではなく、ボタン本体の下にある側面。だから半透明にせず、面の色より一段暗い実色を置く */
+  --edge-pink:  oklch(0.58 0.14 22);
+  --edge-mint:  oklch(0.58 0.11 158);
+  --edge-soft:  oklch(0.86 0.016 80);
+  --lift: 7px;          /* 厚みの高さ。押すとこのぶん沈む */
+  --lift-sm: 5px;
+
+  /* ---- 余白（4pt グリッド） ---- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px; --s-5: 20px;
+  --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 56px; --s-10: 72px;
+
+  /* ---- 書体 ---- */
+  --font-display: 'Fraunces', 'Zen Maru Gothic', ui-serif, serif;
+  --font-body:    'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
+  --font-mono:    'DM Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* ---- 動き ---- */
+  --ease-soft:   cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:    cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 340ms; --dur-4: 560ms;
+
+  /* 「現れる・伸びる」ものは、上の汎用スケールだと 340ms は足りず 560ms は長い。
+   * 用途で引けるように名前を付けた2つ。ずらし幅は「並ぶものは40〜80ms刻み」の下限。
+   * --ease-smooth-out は --ease-out より手前で減速する。出だしで一気に動いて、
+   * 止まる寸前をゆっくり見せたいとき（波紋・バー）に使う。 */
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-reveal:   400ms;
+  --dur-stagger:   40ms;
+  --dur-emphasis: 500ms;   /* 見せ場（バッジの出現、成功の合図） */
+
+  /* ---- 棚の色 ---- */
+  --shelf-fridge:  var(--brand-mint);      --shelf-fridge-deep:  var(--brand-mint-deep);
+  --shelf-freezer: var(--brand-sky);       --shelf-freezer-deep: oklch(0.55 0.13 235);
+  --shelf-pantry:  var(--brand-butter);    --shelf-pantry-deep:  oklch(0.55 0.14 80);
+  --shelf-daily:   var(--brand-lavender);  --shelf-daily-deep:   oklch(0.55 0.13 300);
+  --shelf-tool:    var(--brand-peach);     --shelf-tool-deep:    oklch(0.55 0.14 50);
+  --shelf-custom:  var(--brand-pink);      --shelf-custom-deep:  var(--brand-pink-deep);
+}
+
+/* ダークは「夜の台所」。パステルは彩度を落として沈める。
+ * パステル面に白文字は載せない方針は暗所でも同じで、濃い同系色を載せる。 */
+:root[data-theme="dark"] {
+  --edge-soft: oklch(0.16 0.012 75);
+  --milk:     oklch(0.21 0.012 75);
+  --cream:    oklch(0.25 0.014 75);
+  --sand:     oklch(0.32 0.014 75);
+  --stone:    oklch(0.66 0.012 78);
+  --charcoal: oklch(0.86 0.010 85);
+  --ink:      oklch(0.95 0.008 85);
+
+  --bg-card: oklch(0.25 0.014 75);
+  --bg-alt:  oklch(0.28 0.014 75);
+
+  /* パステル面は「沈める」と書いておきながら 0.62 前後で中間の明るさに留まっていた。
+   * しかも -deep をダークで上書きしていなかったので、面(0.62)より文字(0.72)のほうが
+   * 明るいという逆転が起きていて、分析カードなどが 1.4:1 しか出ていなかった。
+   * ライト＝淡い面に濃い文字／ダーク＝暗い面に淡い文字、と関係ごと反転させる。
+   * 「パステル面に白は載せない（同系色を載せる）」という方針はどちらでも同じ。 */
+  --brand-mint:     oklch(0.37 0.08 155);
+  --brand-pink:     oklch(0.37 0.08 25);
+  --brand-butter:   oklch(0.37 0.08 90);
+  --brand-lavender: oklch(0.37 0.08 305);
+  --brand-sky:      oklch(0.37 0.08 230);
+  --brand-peach:    oklch(0.37 0.08 55);
+
+  --brand-mint-deep:     oklch(0.86 0.10 155);
+  --brand-pink-deep:     oklch(0.86 0.10 25);
+  --brand-butter-deep:   oklch(0.86 0.10 90);
+  --brand-lavender-deep: oklch(0.86 0.10 305);
+  --brand-sky-deep:      oklch(0.86 0.10 230);
+  --brand-peach-deep:    oklch(0.86 0.10 55);
+
+  /* 棚の -deep は4つだけ直値（0.55）で、面を沈めると暗い面に暗い文字になる。
+   * ブランド側に合わせて明るいほうへ寄せる。fridge と custom は元から参照なので自動で追う。 */
+  --shelf-freezer-deep: var(--brand-sky-deep);
+  --shelf-pantry-deep:  var(--brand-butter-deep);
+  --shelf-daily-deep:   var(--brand-lavender-deep);
+  --shelf-tool-deep:    var(--brand-peach-deep);
+
+  --danger: oklch(0.59 0.19 25);   /* 白抜きのバッジで 4.5:1 を satisfy する明るさまで落とす */
+  --on-accent: oklch(0.20 0.015 60);
+
+  --shadow-xs: 0 1px 2px  oklch(0 0 0 / 0.30);
+  --shadow-sm: 0 2px 6px  oklch(0 0 0 / 0.34);
+  --shadow-md: 0 6px 18px oklch(0 0 0 / 0.40);
+  --shadow-lg: 0 14px 32px oklch(0 0 0 / 0.46);
+}
+
+@media (prefers-color-scheme: dark) {
+  /* 中身は上の :root[data-theme="dark"] と同じ。片方だけ直さないこと。 */
+  :root:not([data-theme="light"]) {
+    --edge-soft: oklch(0.16 0.012 75);
+    --milk:     oklch(0.21 0.012 75);
+    --cream:    oklch(0.25 0.014 75);
+    --sand:     oklch(0.32 0.014 75);
+    --stone:    oklch(0.66 0.012 78);
+    --charcoal: oklch(0.86 0.010 85);
+    --ink:      oklch(0.95 0.008 85);
+
+    --bg-card: oklch(0.25 0.014 75);
+    --bg-alt:  oklch(0.28 0.014 75);
+
+    /* パステル面は「沈める」と書いておきながら 0.62 前後で中間の明るさに留まっていた。
+     * しかも -deep をダークで上書きしていなかったので、面(0.62)より文字(0.72)のほうが
+     * 明るいという逆転が起きていて、分析カードなどが 1.4:1 しか出ていなかった。
+     * ライト＝淡い面に濃い文字／ダーク＝暗い面に淡い文字、と関係ごと反転させる。
+     * 「パステル面に白は載せない（同系色を載せる）」という方針はどちらでも同じ。 */
+    --brand-mint:     oklch(0.37 0.08 155);
+    --brand-pink:     oklch(0.37 0.08 25);
+    --brand-butter:   oklch(0.37 0.08 90);
+    --brand-lavender: oklch(0.37 0.08 305);
+    --brand-sky:      oklch(0.37 0.08 230);
+    --brand-peach:    oklch(0.37 0.08 55);
+
+    --brand-mint-deep:     oklch(0.86 0.10 155);
+    --brand-pink-deep:     oklch(0.86 0.10 25);
+    --brand-butter-deep:   oklch(0.86 0.10 90);
+    --brand-lavender-deep: oklch(0.86 0.10 305);
+    --brand-sky-deep:      oklch(0.86 0.10 230);
+    --brand-peach-deep:    oklch(0.86 0.10 55);
+
+    /* 棚の -deep は4つだけ直値（0.55）で、面を沈めると暗い面に暗い文字になる。
+     * ブランド側に合わせて明るいほうへ寄せる。fridge と custom は元から参照なので自動で追う。 */
+    --shelf-freezer-deep: var(--brand-sky-deep);
+    --shelf-pantry-deep:  var(--brand-butter-deep);
+    --shelf-daily-deep:   var(--brand-lavender-deep);
+    --shelf-tool-deep:    var(--brand-peach-deep);
+
+    --danger: oklch(0.59 0.19 25);   /* 白抜きのバッジで 4.5:1 を satisfy する明るさまで落とす */
+    --on-accent: oklch(0.20 0.015 60);
+
+    --shadow-xs: 0 1px 2px  oklch(0 0 0 / 0.30);
+    --shadow-sm: 0 2px 6px  oklch(0 0 0 / 0.34);
+    --shadow-md: 0 6px 18px oklch(0 0 0 / 0.40);
+    --shadow-lg: 0 14px 32px oklch(0 0 0 / 0.46);
+  }
+}
+
+/* ---- 文字の階段 ---- */
+.type-display { font-family: var(--font-display); font-size: 52px; font-weight: 600; line-height: 1.12; }
+.type-h1 { font-size: 34px; font-weight: 700; line-height: 1.3; }
+.type-h2 { font-size: 26px; font-weight: 700; line-height: 1.35; }
+.type-h3 { font-size: 20px; font-weight: 500; line-height: 1.45; }
+.type-body { font-size: 16px; line-height: 1.75; }
+.type-body-sm { font-size: 14px; line-height: 1.6; }
+.type-label { font-size: 13px; line-height: 1.4; letter-spacing: 0.04em; }
+.type-caption { font-size: 12px; line-height: 1.35; }
+.type-mono { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.02em; }
+
+/* ---- 動きのクラス ---- */
+@keyframes bob      { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes wobble   { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes pop      { 0% { transform: scale(0.55) rotate(-6deg); opacity: 0; } 55% { transform: scale(1.22) rotate(3deg); opacity: 1; } 78% { transform: scale(0.94) rotate(-1deg); } 100% { transform: scale(1) rotate(0); } }
+@keyframes shimmer  { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes scan     { 0%,100% { transform: translateY(-42%); } 50% { transform: translateY(42%); } }
+@keyframes enterUp  { 0% { opacity: 0; transform: translateY(22px) scale(0.9); } 60% { opacity: 1; transform: translateY(-4px) scale(1.03); } 100% { opacity: 1; transform: none; } }
+@keyframes leaveOut { to { opacity: 0; transform: translateX(28px) scale(0.96); } }
+@keyframes sheetUp  { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes hop      { 0% { transform: translateY(0) scale(1) rotate(0); } 28% { transform: translateY(-16px) scale(1.3) rotate(-10deg); } 55% { transform: translateY(0) scale(0.88) rotate(6deg); } 78% { transform: translateY(-5px) scale(1.08) rotate(-3deg); } 100% { transform: translateY(0) scale(1) rotate(0); } }
+/* 閉じる動き。開くほうにだけアニメがあって、閉じるのは hidden 一発でパッと消えていた。
+ * 「出るときは見せる、消えるときは邪魔しない」ので、閉じるほうは短く。 */
+@keyframes sheetDown { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes fadeIn    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut   { from { opacity: 1; } to { opacity: 0; } }
+/* フキダシとトーストは画面中央寄せで translateX(-50%) を持っているので、そこは残す */
+@keyframes slipOut   {
+  from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.96); }
+}
+
+@keyframes burstOut { 0% { transform: translate(0,0) scale(0.4) rotate(0); opacity: 1; } 25% { transform: translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.5)) scale(1.35) rotate(90deg); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(0.25) rotate(var(--spin)); opacity: 0; } }
+
+.motion-bob     { animation: bob 2.6s var(--ease-in-out) infinite; }
+.motion-wobble  { animation: wobble 2.4s var(--ease-in-out) infinite; }
+.motion-pop     { animation: pop 520ms var(--ease-soft); }
+.motion-hop     { animation: hop 620ms var(--ease-soft); }
+.motion-shimmer {
+  background: linear-gradient(90deg, var(--bg-alt) 25%, var(--sand) 37%, var(--bg-alt) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+.motion-scan    { animation: scan 2.2s var(--ease-in-out) infinite; }
+
+/* animation:none だと both/forwards で持たせた「終わったあとの見た目」まで消えるので、
+ * 止めるのではなく一瞬で終わらせる。JS側は data.js の calm() が別途ガードしている。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

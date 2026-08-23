@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <!-- ポケット本体 -->
+  <path d="M14 24 Q14 18 20 18 L60 18 Q66 18 66 24 L66 62 Q66 70 58 70 L22 70 Q14 70 14 62 Z"
+        fill="#B8E6D2" stroke="#6EC5A0" stroke-width="2" stroke-linejoin="round"/>
+  <!-- ポケットのフラップ（開いた口） -->
+  <path d="M14 24 Q14 18 20 18 L60 18 Q66 18 66 24 L60 34 L20 34 Z"
+        fill="#6EC5A0" stroke="#6EC5A0" stroke-width="2" stroke-linejoin="round" opacity="0.9"/>
+  <!-- ステッチ -->
+  <path d="M18 40 L62 40" stroke="#3E9A75" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
+  <!-- 顔（頬） -->
+  <circle cx="30" cy="52" r="3" fill="#FBD8D0"/>
+  <circle cx="50" cy="52" r="3" fill="#FBD8D0"/>
+  <!-- 目 -->
+  <circle cx="32" cy="49" r="1.6" fill="#2E2A24"/>
+  <circle cx="48" cy="49" r="1.6" fill="#2E2A24"/>
+  <!-- 口（にっこり） -->
+  <path d="M35 58 Q40 62 45 58" stroke="#2E2A24" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- 小さな星（"ある" のきらめき） -->
+  <path d="M60 12 L61.5 16 L65 17 L61.5 18 L60 22 L58.5 18 L55 17 L58.5 16 Z"
+        fill="#F8E8B4" stroke="#C39B3A" stroke-width="0.8"/>
+</svg>
