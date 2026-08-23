@@ -19,12 +19,13 @@
  *
  * 家族コードについて：
  *   コードを知っている人だけが中身を見られる、という作り。だから推測されにくい長さが要る。
- *   AI を使う action は、シートに実績のある家だけ・1日 60 回までに制限している
+ *   AI を使う action は、一度でも同期しに来た家（houses 台帳に載っている家）だけ・
+ *   1家1日 60 回・全体で1日 600 回までに制限している
  *   （URL を知っただけの相手に Gemini の枠を使わせないため）。
  *
  * 使う前に（スクリプト プロパティ）：
  *   GEMINI_API_KEY ... 写真の読み取りと献立に使う。https://aistudio.google.com/apikey で取る
- *   GEMINI_MODEL   ... 省略可。既定は gemini-3.6-flash
+ *   GEMINI_MODEL   ... 省略可。空なら候補を順に試し、通ったものをここに控える
  */
 
 var SHEET_NAME = 'data';
@@ -32,11 +33,21 @@ var HEADERS = ['house', 'kind', 'id', 'name', 'qty', 'unit', 'expiry',
                'addedAt', 'updatedAt', 'srv', 'deleted', 'by', 'done', 'ext'];
 var KINDS = { item: 1, shop: 1, chat: 1, fridge: 1 };   // fridge は旧版のデータ用
 
+/* 「この家は実在する」を覚えておく台帳。data シートとは分けてある。
+ * 品目が1つも無い家（入れたばかりの端末）も、ここに載れば実在すると分かる。 */
+var HOUSE_SHEET = 'houses';
+var HOUSE_HEADERS = ['house', 'firstSeen', 'lastSeen'];
+
 var MIN_HOUSE = 4;          // 既存の家はここまで許す（運用中の端末を止めないため）
 var MIN_NEW_HOUSE = 12;     // これから作る家に求める長さ
 var AI_ACTIONS = { 'recognize': 1, 'recognize-receipt': 1, 'suggest-recipes': 1, 'plan-week': 1 };
 var AI_DAILY_LIMIT = 60;    // 1つの家が1日に AI を使える回数
+var AI_GLOBAL_DAILY_LIMIT = 600;   // すべての家を合わせた1日の上限（枠を空にされないための止め）
 var QUOTA_KEY = 'aiQuota';
+
+/* Gemini のモデル候補。上から順に試して、通ったものを GEMINI_MODEL に控える。
+ * 名前は Google 側で入れ替わるので、1つに賭けない。 */
+var GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 
 /** 動作確認用。ブラウザで /exec を開くとこれが返る */
 function doGet(e) {
@@ -61,7 +72,11 @@ function doPost(e) {
      *   ② そのうえで 1日の回数に上限をつける（正しいコードが漏れても被害を止める） */
     if (AI_ACTIONS[req.action]) {
       if (!knownHouse(house)) {
-        return json({ ok: false, error: 'この家族コードでは使えません。先に「設定 > 共有」で同期を済ませてください' });
+        /* code はクライアントが見分けるための印。
+         * 「家族コードを作った直後で、まだ1回目の同期が届いていない」だけのことがあるので、
+         * 受け取った側は一度同期してから、もう一度だけ頼み直す。 */
+        return json({ ok: false, code: 'unknown-house',
+                      error: 'この家族コードでは使えません。先に「設定 > 共有」で同期を済ませてください' });
       }
       if (!takeAiQuota(house)) {
         return json({ ok: false, error: '今日はもうたくさん使いました。また明日おねがいします' });
@@ -101,11 +116,19 @@ function syncImpl(house, since, changes) {
 
   // house + kind + id  ->  values の添字
   var index = {};
+  var maxSrv = 0;
   for (var i = 0; i < values.length; i++) {
     index[key(values[i][0], values[i][1], values[i][2])] = i;
+    var srv = Number(values[i][9]) || 0;
+    if (srv > maxSrv) maxSrv = srv;
   }
 
+  /* 「前回の続き」は srv > since で切り出している。
+   * 同じミリ秒に2回書き込むと srv が並んでしまい、あとから来た変更が
+   * 片方の端末にだけ永久に届かなくなる（消したことが伝わらない、など）。
+   * srv は必ず前より大きくなるようにして、取りこぼしを無くす。 */
   var now = Date.now();
+  if (now <= maxSrv) now = maxSrv + 1;
   var appends = [];
   // 送られてきたレコードは、採用しなかったものも含めて必ず返す。
   // そうしないと「古いから弾いた」ことが送り主に伝わらず、ずれたまま残る
@@ -149,7 +172,12 @@ function syncImpl(house, since, changes) {
   }
 
   if (appends.length) {
-    sh.getRange(sh.getLastRow() + 1, 1, appends.length, HEADERS.length).setValues(appends);
+    var rng = sh.getRange(sh.getLastRow() + 1, 1, appends.length, HEADERS.length);
+    /* 書く前に「書式なしテキスト」にしておく。シートを作ったときに敷いた書式は
+     * 最初の1000行ぶんしかないので、そこを越えると期限「2026-09-01」が
+     * 勝手に日付に変換され、家族には読めない文字列になって届く。 */
+    rng.setNumberFormat('@');
+    rng.setValues(appends);
   }
 
   // 前回の続き（srv > since）だけ返す
@@ -173,6 +201,11 @@ function syncImpl(house, since, changes) {
       ext: String(v[13] || '')
     });
   }
+
+  /* 品目が1つも無くても、同期しに来た時点でこの家は実在する。
+   * ここで台帳に載せておかないと、入れたばかりの端末（棚が空）は
+   * いつまでも knownHouse が false のままで、写真の読み取りが使えない。 */
+  registerHouse(house, now);
 
   return { ok: true, now: now, rows: rows };
 }
@@ -346,34 +379,47 @@ function gemini(prompt, dataUrl) {
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY が未設定です（Apps Script の「プロジェクトの設定 > スクリプト プロパティ」に入れてください）');
   }
-  var model = props.getProperty('GEMINI_MODEL') || 'gemini-3.6-flash';
-
   var parts = [{ text: prompt }];
   if (dataUrl) {
     var m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
     if (!m) throw new Error('写真の形式が読めませんでした');
     parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
   }
+  var payload = JSON.stringify({
+    contents: [{ role: 'user', parts: parts }],
+    generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
+  });
 
-  var res = UrlFetchApp.fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(apiKey),
-    {
-      method: 'post',
-      contentType: 'application/json',
-      muteHttpExceptions: true,
-      payload: JSON.stringify({
-        contents: [{ role: 'user', parts: parts }],
-        generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
-      })
+  /* モデル名が Google 側で入れ替わると 404 が返り、写真の読み取りも献立も
+   * まるごと動かなくなる。原因が見えないまま「使えない」状態が続くのが一番困るので、
+   * 通らなかったら順に次を試す。GEMINI_MODEL が入っていればそれを最優先。 */
+  var models = [];
+  var chosen = props.getProperty('GEMINI_MODEL');
+  if (chosen) models.push(chosen);
+  for (var g = 0; g < GEMINI_MODELS.length; g++) {
+    if (models.indexOf(GEMINI_MODELS[g]) < 0) models.push(GEMINI_MODELS[g]);
+  }
+
+  var code = 0, body = '', lastMsg = '';
+  for (var t = 0; t < models.length; t++) {
+    var res = UrlFetchApp.fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' + models[t]
+        + ':generateContent?key=' + encodeURIComponent(apiKey),
+      { method: 'post', contentType: 'application/json', muteHttpExceptions: true, payload: payload }
+    );
+    code = res.getResponseCode();
+    body = res.getContentText();
+    if (code === 200) {
+      /* 通ったモデルを控えておく。次からは1回目で当たる */
+      if (models[t] !== chosen) props.setProperty('GEMINI_MODEL', models[t]);
+      break;
     }
-  );
-
-  var code = res.getResponseCode();
-  var body = res.getContentText();
+    try { lastMsg = JSON.parse(body).error.message; } catch (ignore) { lastMsg = body; }
+    // そのモデルが無い／使えないときだけ次を試す。鍵や枠の問題なら、試し直しても同じ
+    if (code !== 404 && code !== 400) break;
+  }
   if (code !== 200) {
-    var msg = body;
-    try { msg = JSON.parse(body).error.message; } catch (ignore) {}
-    throw new Error('AI が答えられませんでした（' + code + '）：' + msg);
+    throw new Error('AI が答えられませんでした（' + code + '）：' + lastMsg);
   }
 
   var data = JSON.parse(body);
@@ -400,7 +446,15 @@ function key(house, kind, id) {
 
 /* ==================== 家族コードの検査と回数の上限 ==================== */
 
-/** すでにシートに行がある家かどうか。毎回シートを読むと遅いので5分だけ覚えておく */
+/**
+ * 一度でも同期しに来たことのある家かどうか。
+ *
+ * 以前は data シートに「行があるか」で見ていた。
+ * これだと、入れたばかりで棚が空の端末は行が1つも書かれないので、
+ * 家族コードを作って同期を済ませても、ずっと「使えません」と言われ続けていた
+ * （そして棚を埋めるための写真の読み取りこそが、その最初の一歩だった）。
+ * いまは houses 台帳で見る。同期しに来ればそれだけで載る。
+ */
 function knownHouse(house) {
   var cache = CacheService.getScriptCache();
   var ck = 'known:' + house;
@@ -408,20 +462,83 @@ function knownHouse(house) {
   if (hit === '1') return true;
   if (hit === '0') return false;
 
-  var sh = getSheet();
-  var last = sh.getLastRow();
-  var found = false;
-  if (last >= 2) {
-    var col = sh.getRange(2, 1, last - 1, 1).getValues();
-    for (var i = 0; i < col.length; i++) {
-      if (String(col[i][0]) === house) { found = true; break; }
-    }
+  var found = houseRowOf(house) > 0;
+
+  /* 台帳ができる前からある家は、data シートに行があれば実在する。
+   * 見つけたら台帳にも書き写して、次からは台帳だけで済むようにする。 */
+  if (!found && hasDataRows(house)) {
+    registerHouse(house, Date.now());
+    found = true;
   }
+
   /* 「ある」は5分、「ない」は30秒しか覚えない。
    * 家族コードを変えた直後は、同期が済むまで一瞬「ない」になる。
    * そこを5分も覚えていると、写真の読み取りとレシピが理由もわからず使えなくなる。 */
   cache.put(ck, found ? '1' : '0', found ? 300 : 30);
   return found;
+}
+
+/** 台帳の中の行番号（1始まり、見つからなければ 0） */
+function houseRowOf(house) {
+  var sh = getHouseSheet();
+  var last = sh.getLastRow();
+  if (last < 2) return 0;
+  var col = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < col.length; i++) {
+    if (String(col[i][0]) === house) return i + 2;
+  }
+  return 0;
+}
+
+/** data シートに1行でもあるか（台帳ができる前からある家の救済） */
+function hasDataRows(house) {
+  var sh = getSheet();
+  var last = sh.getLastRow();
+  if (last < 2) return false;
+  var col = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < col.length; i++) {
+    if (String(col[i][0]) === house) return true;
+  }
+  return false;
+}
+
+/**
+ * 台帳に載せる（すでにあれば最終利用日を書き直す）。
+ * 同期は端末ごとに1分おきに来るので、毎回書くと無駄が多い。
+ * 「載っている」と覚えているあいだ（5分）は何もしない。
+ */
+function registerHouse(house, now) {
+  var cache = CacheService.getScriptCache();
+  if (cache.get('known:' + house) === '1') return;
+
+  var sh = getHouseSheet();
+  var at = houseRowOf(house);
+  if (at) sh.getRange(at, 3, 1, 1).setValues([[now]]);
+  else    sh.getRange(sh.getLastRow() + 1, 1, 1, HOUSE_HEADERS.length).setValues([[house, now, now]]);
+  cache.put('known:' + house, '1', 300);
+}
+
+/** 台帳シート。無ければ作る */
+function getHouseSheet() {
+  var ss = SpreadsheetApp.getActive();
+  if (!ss) {
+    throw new Error('スプレッドシートに紐づいていません。'
+      + 'スプレッドシートの「拡張機能 > Apps Script」から作り直してください');
+  }
+  var sh = ss.getSheetByName(HOUSE_SHEET);
+  if (!sh) {
+    /* 同時に2つ走ると、片方の insertSheet が「同じ名前がある」で落ちる。
+     * 落ちたほうは、先に作られたシートを拾い直せばいい */
+    try {
+      sh = ss.insertSheet(HOUSE_SHEET);
+    } catch (err) {
+      return ss.getSheetByName(HOUSE_SHEET);
+    }
+    sh.getRange(1, 1, sh.getMaxRows(), HOUSE_HEADERS.length).setNumberFormat('@');
+    sh.getRange(1, 1, 1, HOUSE_HEADERS.length).setValues([HOUSE_HEADERS]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
 }
 
 /**
@@ -438,7 +555,14 @@ function takeAiQuota(house) {
 
   var n = (state.counts[house] || 0) + 1;
   if (n > AI_DAILY_LIMIT) return false;
+
+  /* 家ごとの上限だけだと、コードを次々に作れば抜けられてしまう。
+   * 全体にも上限を置いて、Gemini の枠が一気に空くことだけは防ぐ。 */
+  var all = (state.counts['*'] || 0) + 1;
+  if (all > AI_GLOBAL_DAILY_LIMIT) return false;
+
   state.counts[house] = n;
+  state.counts['*'] = all;
   props.setProperty(QUOTA_KEY, JSON.stringify(state));
   return true;
 }
