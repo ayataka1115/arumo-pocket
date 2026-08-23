@@ -1,5 +1,23 @@
 /* アルノポケット — 触ったときに起きること */
 
+/* LINE などアプリ内ブラウザで開かれているか。
+ * ここから「他のブラウザで開く」を選ぶと、端末の控え（localStorage）は
+ * 引き継がれず、家族コードだけが消えたように見える。
+ * URL に合言葉を残しておけば、開き直した先でもそのまま仲間に入れる。 */
+const IN_APP_BROWSER = /Line\/|FBAN|FBAV|Instagram|MicroMessenger|KAKAOTALK/i.test(navigator.userAgent);
+
+/* 招待リンク。合言葉は ? のほうに置く。
+ * # から後ろはアプリ内ブラウザの受け渡しで落ちることがあるため。 */
+function inviteUrl(code) {
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  return `${base}?join=${encodeURIComponent(code)}`;
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('コピーしました'); return true; }
+  catch { toast('この端末ではコピーできませんでした'); return false; }
+}
+
 /* ============ タブ・棚を開く ============ */
 $$('.tab').forEach(b => b.onclick = () => setView(b.dataset.view));
 $('#shelf-back').onclick = () => setView('home');
@@ -803,12 +821,20 @@ function renderSettings() {
         <button id="s-house-make" class="btn-ghost">新しく作る</button>
       </div>
       <p id="sync-detail" class="hint type-caption"></p>
-      <button id="s-sync-now" class="btn-ghost wide">いますぐ合わせる</button>
+      <div class="row-tight">
+        <button id="s-sync-now" class="btn-ghost wide">いますぐ合わせる</button>
+        <button id="s-house-copy" class="btn-ghost">コードをコピー</button>
+      </div>
       <p class="hint type-caption"><strong>家族コードが同じ端末どうしが、同じ棚・同じ買い物リストになります。</strong>これは合言葉なので、家族以外には教えないでください。</p>
+      ${IN_APP_BROWSER ? `
+      <p class="hint type-caption"><strong>いまは LINE などアプリの中のブラウザで開いています。</strong>ここから「他のブラウザで開く」を選ぶと、いつも使うブラウザでも同じ家族コードのまま開けます。もし引き継がれなかったときは、上の「コードをコピー」で控えて、開いた先の同じ欄に貼り付けてください。</p>` : ''}
 
       <label class="field-label">家族を呼ぶ</label>
-      <button id="s-invite" class="btn-ghost wide">招待リンクを送る</button>
-      <p class="hint type-caption">このリンクを開いた端末は、<strong>家族コードを打たずにそのまま仲間に入れます。</strong>合言葉が入ったリンクなので、家族にだけ送ってください。</p>
+      <div class="row-tight">
+        <button id="s-invite" class="btn-ghost wide">招待リンクを送る</button>
+        <button id="s-invite-copy" class="btn-ghost">リンクをコピー</button>
+      </div>
+      <p class="hint type-caption">このリンクを開いた端末は、<strong>家族コードを打たずにそのまま仲間に入れます。</strong>合言葉が入ったリンクなので、家族にだけ送ってください。<br>受け取った家族が LINE の中で開いたときは、そのまま「他のブラウザで開く」を選んでもらえば、いつものブラウザにも引き継がれます。</p>
 
       <details class="fold">
         <summary>つなぎ先を変える（ふだんは触らない）</summary>
@@ -931,8 +957,17 @@ $('#set-body').addEventListener('click', e => {
   /* 共有 */
   if (b.id === 's-invite') {
     if (!settings.house) { toast('先に家族コードを決めてください'); return; }
-    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-    shareText(`アルノポケットに招待します。\nこのリンクを開くと、そのまま同じ棚が見られます。\n\n${base}#join=${encodeURIComponent(settings.house)}`);
+    shareText(`アルノポケットに招待します。\nこのリンクを開くと、そのまま同じ棚が見られます。\n\n${inviteUrl(settings.house)}\n\n（うまく入れないときは、家族コード「${settings.house}」を設定の「共有」に打ち込んでください）`);
+    return;
+  }
+  if (b.id === 's-invite-copy') {
+    if (!settings.house) { toast('先に家族コードを決めてください'); return; }
+    copyText(inviteUrl(settings.house));
+    return;
+  }
+  if (b.id === 's-house-copy') {
+    if (!settings.house) { toast('先に家族コードを決めてください'); return; }
+    copyText(settings.house);
     return;
   }
   if (b.id === 's-house-make') {
@@ -973,6 +1008,8 @@ function setShare(patch) {
     saveAll();
   }
   setSyncState(settings.url && settings.house ? (syncState === 'off' ? 'syncing' : syncState) : 'off');
+  /* アプリ内ブラウザでは、URL 側の合言葉も追いかけさせる（別ブラウザへの引き継ぎ用） */
+  if (IN_APP_BROWSER) { settings.house ? keepCodeInUrl() : stripCodeFromUrl(); }
   scheduleSync(300);
 }
 
@@ -1101,21 +1138,50 @@ live(items).forEach(i => pendingEnter.add(i.id));
 renderAll();
 renderRecipes();
 setView('home');
-/* 招待リンク（#join=合言葉）で開かれたとき。
+/* 招待リンク（?join=合言葉）で開かれたとき。
  * 家族は何も打たずに仲間に入れる。すでに別の家に入っている端末では、
  * 黙って乗り換えると手元の品目が別の家に混ざるので、必ず確かめる。 */
 (function joinFromLink() {
-  const m = location.hash.match(/[#&]join=([^&]+)/);
+  /* ?join= が本命。古いリンク（#join=）も拾う */
+  const m = location.search.match(/[?&]join=([^&]*)/) || location.hash.match(/[#&]join=([^&]*)/);
   if (!m) return;
   let code = '';
   try { code = decodeURIComponent(m[1]).trim(); } catch { return; }
-  history.replaceState(null, '', location.pathname + location.search);   // リンクを履歴に残さない
-  if (!code || code === settings.house) return;
+  if (!code) return;
+
+  /* アプリ内ブラウザでは合言葉を URL に残す（後段の keepCodeInUrl が付け直す）。
+   * LINE の「他のブラウザで開く」は、いま表示している URL をそのまま渡すので、
+   * ここで消してしまうと、開き直した先に家族コードが引き継がれない。
+   * ふつうのブラウザでは、リンクを履歴に残さないよう消す。 */
+  if (!IN_APP_BROWSER) stripCodeFromUrl();
+
+  if (code === settings.house) return;
   if (settings.house && !confirm(`いまの家族（${settings.house}）から、こちらに乗り換えますか。\n\n${code}\n\n手元の棚の中身は、乗り換えた先に合流します。`)) return;
   setShare({ house: code });
   renderAll();
   toast('家族に加わりました');
 })();
+
+/* URL から合言葉を落とす（履歴に残さない）。ほかの param と # は触らない */
+function stripCodeFromUrl() {
+  const u = new URL(location.href);
+  u.searchParams.delete('join');
+  u.hash = u.hash.replace(/([#&])join=[^&]*&?/, '$1').replace(/[#&]$/, '');
+  history.replaceState(null, '', u.pathname + u.search + u.hash);
+}
+
+/* アプリ内ブラウザのときは、家族コードを URL に載せたままにしておく。
+ * LINE の「他のブラウザで開く」は URL しか渡さないので、これが唯一の引き継ぎ手段になる。
+ * 招待リンクから来ていなくても（自分で打ち込んだ端末でも）同じように効く。 */
+function keepCodeInUrl() {
+  if (!IN_APP_BROWSER || !settings.house) return;
+  const u = new URL(location.href);
+  const hash = u.hash.replace(/([#&])join=[^&]*&?/, '$1').replace(/[#&]$/, '');   // 旧 #join= は二重になるので落とす
+  if (u.searchParams.get('join') === settings.house && hash === u.hash) return;
+  u.searchParams.set('join', settings.house);
+  history.replaceState(null, '', u.pathname + u.search + hash);
+}
+keepCodeInUrl();
 
 setSyncState(settings.url && settings.house ? 'syncing' : 'off');
 saveAll();
