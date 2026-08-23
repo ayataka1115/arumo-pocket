@@ -357,6 +357,7 @@ function needsAI() {
 }
 
 $('#btn-shoot').onclick = () => { if (!needsAI()) $('#file-shelf').click(); };
+$('#btn-share-shop').onclick = () => shareText(shopAsText());
 $('#btn-receipt').onclick = () => { if (!needsAI()) $('#file-receipt').click(); };
 
 function showRecognizing(title, sub) {
@@ -750,10 +751,16 @@ function renderSettings() {
 
   } else if (setTab === 'data') {
     body.innerHTML = `
-      <button id="s-csv" class="btn-ghost wide">棚の中身を CSV で書き出す</button>
-      <button id="s-csv-hist" class="btn-ghost wide">これまでの記録を CSV で書き出す</button>
+      <label class="field-label">そのまま送る</label>
+      <button id="s-share-shop" class="btn-ghost wide">買うものを送る</button>
+      <button id="s-share-shelf" class="btn-ghost wide">棚の中身を送る</button>
+      <p class="hint type-caption">LINE やメールにそのまま貼れる文章で送ります。家族コードを知らない人にも渡せます。</p>
+
+      <label class="field-label">表として出す</label>
+      <button id="s-csv" class="btn-ghost wide">棚の中身を CSV で</button>
+      <button id="s-csv-hist" class="btn-ghost wide">これまでの記録を CSV で</button>
       <button id="s-json" class="btn-ghost wide">まるごとバックアップ（JSON）</button>
-      <p class="hint type-caption">CSV は Excel / Numbers / スプレッドシートでそのまま開けます。</p>`;
+      <p class="hint type-caption">CSV は Excel / Numbers / スプレッドシートでそのまま開けます。iPhone では共有シートが出るので、「ファイルに保存」を選んでください。</p>`;
   }
 
   syncSegPills($('#set-body'));
@@ -868,6 +875,8 @@ $('#set-body').addEventListener('click', e => {
   }
 
   /* データ */
+  if (b.id === 's-share-shop')  { shareText(shopAsText()); return; }
+  if (b.id === 's-share-shelf') { shareText(shelvesAsText()); return; }
   if (b.id === 's-csv')      { exportItemsCsv(); return; }
   if (b.id === 's-csv-hist') { exportHistoryCsv(); return; }
   if (b.id === 's-json')     { exportJson(); return; }
@@ -887,7 +896,61 @@ function setShare(patch) {
   scheduleSync(300);
 }
 
-/* ============ 書き出し（機能I） ============ */
+/* ============ 書き出しと共有（機能I） ============ */
+
+/* iPhone の共有シートに渡す。
+ * `<a download>` は iPhone のホーム画面から開いたとき（standalone）に当てにならず、
+ * 何も起きないことがある。共有シートなら LINE・メール・ファイルのどれにも渡せる。
+ * 使えない環境（PCのブラウザなど）では、これまでどおりダウンロードに落ちる。 */
+async function shareFile(name, text, mime) {
+  const blob = new Blob([mime.startsWith('text/csv') ? '\ufeff' + text : text], { type: mime });
+  const file = new File([blob], name, { type: mime });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+      return true;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return true;   // 本人がやめただけ
+    }
+  }
+  download(name, text, mime);
+  return false;
+}
+
+/* 文章そのものを渡す。買うものを LINE に送る、がこれ。 */
+async function shareText(text) {
+  if (navigator.share) {
+    try { await navigator.share({ text }); return true; }
+    catch (err) { if (err && err.name === 'AbortError') return true; }
+  }
+  /* 共有シートが無い環境では、せめて手元にコピーする */
+  try { await navigator.clipboard.writeText(text); toast('コピーしました'); return true; }
+  catch { toast('この端末では共有できませんでした'); return false; }
+}
+
+/* ---- 人が読む形の文章 ---- */
+function shopAsText() {
+  const list = live(shop);
+  const left = list.filter(s => !s.done);
+  if (!left.length) return '買うものはありません。';
+  return `買うもの（${left.length}件）\n` + left.map(s => '・' + s.name).join('\n');
+}
+
+function shelvesAsText() {
+  const out = [`おうちの棚（${ymd(new Date())}）`];
+  settings.shelves.forEach(sh => {
+    const list = itemsOf(sh.id);
+    if (!list.length) return;
+    out.push('', `[${sh.name}] ${list.length}品`);
+    list.slice().sort(byExpiry).forEach(it => {
+      const amount = it.mode === 'stock' ? stockLabel(it.stock) : `${it.qty}${it.unit}`;
+      const t = it.expiry ? `（${expiryTag(it.expiry).text}）` : '';
+      out.push(`・${it.name} ${amount}${t}`);
+    });
+  });
+  return out.length === 1 ? '棚にはまだ何も入っていません。' : out.join('\n');
+}
+
 function download(name, text, mime) {
   /* Excel が UTF-8 と分かるように BOM を先頭に付ける */
   const blob = new Blob([mime.startsWith('text/csv') ? '﻿' + text : text], { type: mime });
@@ -914,8 +977,7 @@ function exportItemsCsv() {
       it.by, new Date(it.updatedAt).toLocaleString('ja-JP'),
     ];
   });
-  download(`arumo-items-${stamp()}.csv`, csvRows([head, ...rows]), 'text/csv;charset=utf-8');
-  toast('CSV を書き出しました');
+  shareFile(`arumo-items-${stamp()}.csv`, csvRows([head, ...rows]), 'text/csv;charset=utf-8');
 }
 
 function exportHistoryCsv() {
@@ -929,12 +991,11 @@ function exportHistoryCsv() {
     }
   }
   rows.sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  download(`arumo-history-${stamp()}.csv`, csvRows([head, ...rows]), 'text/csv;charset=utf-8');
-  toast('CSV を書き出しました');
+  shareFile(`arumo-history-${stamp()}.csv`, csvRows([head, ...rows]), 'text/csv;charset=utf-8');
 }
 
 function exportJson() {
-  download(`arumo-backup-${stamp()}.json`,
+  shareFile(`arumo-backup-${stamp()}.json`,
     JSON.stringify({ items, shop, chat, settings, exportedAt: new Date().toISOString() }, null, 2),
     'application/json');
 }
