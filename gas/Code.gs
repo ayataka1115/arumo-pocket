@@ -452,6 +452,12 @@ function gemini(prompt, dataUrl) {
       cache.put('rest:' + model, '1', GEMINI_DEAD_REST);
       continue;
     }
+    /* 400 は「こちらの送り方が悪い」ことが多い（写真が壊れている等）。
+     * これをモデルのせいにして休ませると、誰かが1枚おかしな写真を送っただけで、
+     * 上のモデルが家族ぜんぶに対して5分止まる。
+     * モデルの名前を咎めている 400 のときだけ、モデルのせいだと見なす。 */
+    if (lastCode === 400 && !aboutModel(lastMsg)) break;
+
     if (lastCode === 400 || lastCode === 403 || lastCode === 429 || lastCode === 503) {
       /* この鍵では使えない（無料枠に無い）／回数の上限／混み合っている。
        * どれも「少し置けば変わりうる」ので、短く休ませて次の頭のいいものへ下りる。 */
@@ -521,6 +527,12 @@ function candidateModels(props) {
     if (models.indexOf(list[i]) < 0) models.push(list[i]);
   }
   return models;
+}
+
+/** そのモデルを咎めている返事か。送った中身の問題と分けるために見る */
+function aboutModel(msg) {
+  var m = String(msg || '').toLowerCase();
+  return m.indexOf('model') >= 0 || m.indexOf('not found') >= 0 || m.indexOf('not supported') >= 0;
 }
 
 /** 鍵そのものが通っていないか。モデルを替えても直らないのはこれだけ */
