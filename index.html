@@ -135,8 +135,13 @@
 
   <!-- ========== レシピ ========== -->
   <section id="view-recipes" class="view" hidden>
+    <div class="seg tabs2" id="recipe-tabs">
+      <button type="button" data-rtab="today" class="is-on">今日</button>
+      <button type="button" data-rtab="week">1週間</button>
+    </div>
+
     <div class="row-between">
-      <h2 class="section-head type-label">今日つくれそうなもの</h2>
+      <h2 id="recipe-head" class="section-head type-label">今日つくれそうなもの</h2>
       <button id="btn-recipes" class="btn-text accent">ほかにも</button>
     </div>
     <section id="from-food" class="widget" hidden>
@@ -146,6 +151,19 @@
 
     <div id="recipe-list" class="recipe-list"></div>
     <p id="recipe-empty" class="empty type-body-sm"></p>
+
+    <!-- 1週間分 -->
+    <div id="week-plan" hidden>
+      <div id="week-days" class="recipe-list"></div>
+
+      <section id="week-buy" class="widget" hidden>
+        <h2 class="widget-head type-label">まとめて買うもの<span id="week-buy-n" class="widget-count type-mono"></span></h2>
+        <ul id="week-buy-list" class="buy-all"></ul>
+        <button id="btn-week-to-shop" class="btn-primary wide">ぜんぶ買うものに入れる</button>
+      </section>
+
+      <p id="week-empty" class="empty type-body-sm"></p>
+    </div>
   </section>
 
   <!-- ========== 分析 ========== -->

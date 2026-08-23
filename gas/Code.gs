@@ -7,7 +7,8 @@
  *   sync               ... 棚・買い物・ことづての差分同期
  *   recognize          ... 棚の写真 → 品目の一覧
  *   recognize-receipt  ... レシートの写真 → 買ったものの一覧
- *   suggest-recipes    ... 手元の食材 → 献立3つ
+ *   suggest-recipes    ... 手元の食材 → 今日の献立4つ
+ *   plan-week          ... 手元の食材 → 7日分の夕飯と、まとめ買いの一覧
  *
  * 差分同期の考え方：
  *   - 1レコード = 1行。行は消さず「消した印」(deleted) を立てる（削除も相手に伝えるため）
@@ -33,7 +34,7 @@ var KINDS = { item: 1, shop: 1, chat: 1, fridge: 1 };   // fridge は旧版の�
 
 var MIN_HOUSE = 4;          // 既存の家はここまで許す（運用中の端末を止めないため）
 var MIN_NEW_HOUSE = 12;     // これから作る家に求める長さ
-var AI_ACTIONS = { 'recognize': 1, 'recognize-receipt': 1, 'suggest-recipes': 1 };
+var AI_ACTIONS = { 'recognize': 1, 'recognize-receipt': 1, 'suggest-recipes': 1, 'plan-week': 1 };
 var AI_DAILY_LIMIT = 60;    // 1つの家が1日に AI を使える回数
 var QUOTA_KEY = 'aiQuota';
 
@@ -70,6 +71,7 @@ function doPost(e) {
     if (req.action === 'recognize')         return json(recognizeShelf(req));
     if (req.action === 'recognize-receipt') return json(recognizeReceipt(req));
     if (req.action === 'suggest-recipes')   return json(suggestRecipes(req));
+    if (req.action === 'plan-week')         return json(planWeek(req));
     if (req.action !== 'sync')              return json({ ok: false, error: '不明な action です' });
 
     /* 新しい家をつくるときだけ、長めのコードを求める。
@@ -275,6 +277,66 @@ function suggestRecipes(req) {
 
   var out = gemini(prompt, null);
   return { ok: true, recipes: (out && out.recipes) || [] };
+}
+
+function planWeek(req) {
+  var have = (req.have || []).map(function (h) {
+    return '- ' + h.name + ' ' + (h.qty || '') + (h.unit || '')
+      + (h.daysLeft === null || h.daysLeft === undefined ? '' : '（あと' + h.daysLeft + '日）');
+  }).join('\n');
+
+  var people = req.people ? String(req.people) : '2人';
+
+  var prompt = [
+    'あなたは家庭の献立係です。これから1週間ぶんの夕飯を組み立ててください。',
+    '',
+    'いま家にあるもの：',
+    have || '（ほとんど何もない）',
+    '',
+    '何人ぶんか：' + people,
+    '',
+    '**組み立ての順番（ここが最も大事）**：',
+    '- **1日目と2日目は、いま家にあるものを中心にする。** 買い足しは最小限',
+    '- **期限が近いものから先に使い切る**。傷ませない献立にする',
+    '- 3日目以降は買い足してよいが、**買うものを増やしすぎない**',
+    '',
+    '**食材は使い回すこと**：',
+    '- キャベツ1玉を買ったら、2〜3日に分けて使う献立にする',
+    '- 1日にしか使わない食材を、何種類も買わせない',
+    '- 同じ肉を2日に分けるなど、まとめ買いが活きる組み方にする',
+    '',
+    '**7日を似たものばかりにしない**：',
+    '- 肉と魚、和洋中、こってりとあっさりを散らす',
+    '- 同じ主材料が2日続かないようにする',
+    '- 週の後半に1日は「簡単に済ませる日」（15分以内）を入れる',
+    '',
+    '各日について：',
+    '- kind は "asis"（買い足し無しで作れる）か "plus"（買い足しが要る）',
+    '- have には、その日に使う「いま家にあるもの」だけを入れる。無いものを入れない',
+    '- buy には、その日のために買い足すものを入れる。**同じものを何日も buy に入れない**',
+    '  （まとめて買って分けて使うので、最初に使う日にだけ入れる）',
+    '- note は1行。なぜこの日にこれなのか（例：キャベツを使い切る、前日の残りを活かす）',
+    '',
+    'buyAll には、7日ぶんの買い足しを**まとめて**入れてください：',
+    '- 同じものは1つにまとめ、量を合算する（例：豚こま切れ肉 400g）',
+    '- for に、何日目で使うかを書く（例："2日目・5日目"）',
+    '- 売り場ごとに近いものが並ぶよう、肉魚 → 野菜 → その他 の順にする',
+    '',
+    '守ること：',
+    '- 塩・しょうゆ・みそ・砂糖・酢・油のような基本の調味料は、どの家にもある前提。buy に入れない',
+    '- ただしケチャップ・カレールウ・キムチの素のような「味の方向を決める調味料」は、',
+    '  家にあるなら have に入れて活かしてよい',
+    '- 珍しい食材・高い食材・使い切れない量のものは入れない',
+    '- **絶対に7日ぶん返す。少なく返さない**',
+    '- level は「かんたん」「ふつう」「ちょっと手間」のどれか、time は「20分」など',
+    '',
+    'JSON だけを返す。説明文もコードフェンスも付けない：',
+    '{"days":[{"day":1,"title":"","kind":"asis","level":"","time":"","have":[""],"buy":[],"note":""}],'
+      + '"buyAll":[{"name":"","for":""}]}'
+  ].join('\n');
+
+  var out = gemini(prompt, null);
+  return { ok: true, days: (out && out.days) || [], buyAll: (out && out.buyAll) || [] };
 }
 
 /** プロンプト（と、あれば画像）を Gemini に渡し、返ってきた JSON を object にして返す */

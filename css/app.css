@@ -878,3 +878,39 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 .fold > summary::-webkit-details-marker { display: none; }
 .fold > summary::before { content: "＋ "; }
 .fold[open] > summary::before { content: "− "; }
+
+
+/* ============ 1週間分の献立 ============ */
+#recipe-tabs { margin-bottom: var(--s-4); }
+
+.recipe.day { padding-top: var(--s-4); }
+.day-head { display: flex; align-items: flex-start; gap: var(--s-3); }
+/* 何日目かは順番そのものなので、番号で示すのが正しい */
+.day-n {
+  flex: none;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--bg-alt);
+  border: 1px solid var(--border-soft);
+  font-size: 13px; font-style: normal;
+  color: var(--fg-2);
+}
+.recipe.day[data-kind="asis"] .day-n {
+  background: var(--brand-mint); color: var(--brand-mint-deep); border-color: transparent;
+}
+.day-title { min-width: 0; }
+.day-title .recipe-title { margin: 0 0 6px; }
+
+/* まとめ買いの一覧 */
+.buy-all { display: flex; flex-direction: column; }
+.buy-all li {
+  display: flex; align-items: baseline; gap: var(--s-2);
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.buy-all li:first-child { border-top: none; }
+.ba-name { font-weight: 700; font-size: 15px; }
+.ba-for { margin-left: auto; flex: none; white-space: nowrap; }
+
+.btn-primary.wide { width: 100%; margin-top: var(--s-4); }

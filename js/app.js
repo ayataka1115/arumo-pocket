@@ -498,12 +498,19 @@ $('#review-ok').onclick = () => {
 };
 
 /* ============ レシピ（機能G） ============ */
-$('#btn-recipes').onclick = async () => {
-  if (needsAI()) return;
+/* 献立に渡す材料。食べものの棚にあるものだけ */
+function foodOnHand() {
   const foodShelves = settings.shelves.filter(s => FOOD_SHELF_ICONS.includes(s.icon)).map(s => s.id);
-  const have = live(items)
+  return live(items)
     .filter(i => foodShelves.includes(i.shelf))
     .map(i => ({ name: i.name, qty: i.qty, unit: i.unit, daysLeft: daysLeft(i.expiry) }));
+}
+
+/* 「ほかにも」＝今日の分 ／ 「考えてもらう」＝1週間分。押すボタンは同じ */
+$('#btn-recipes').onclick = async () => {
+  if (recipeTab === 'week') return planWeekNow();
+  if (needsAI()) return;
+  const have = foodOnHand();
   if (!have.length) { toast('食べものの棚がまだ空っぽです'); return; }
 
   showRecognizing('なに作ろっか〜', '棚の中を見ています');
@@ -531,6 +538,59 @@ $('#btn-recipes').onclick = async () => {
     toast(String(err.message || err));
   }
 };
+
+/* 1週間分。今日の分より時間がかかるので、待ち画面の言い方を変えている */
+async function planWeekNow() {
+  if (needsAI()) return;
+  const have = foodOnHand();
+  if (!have.length) { toast('食べものの棚がまだ空っぽです'); return; }
+  if (weekPlan && !confirm('いまの1週間分を作り直しますか。\n前のものは消えます。')) return;
+
+  showRecognizing('1週間ぶん、考えるね', '使い切る順番を組み立てています');
+  try {
+    const res = await aiPlanWeek({ have, people: settings.people || '2人' });
+    hideRecognizing();
+    const days = (res.days || []).slice(0, 7);
+    if (!days.length) {
+      fireMood('recipe-fail');
+      toast('うまく組み立てられませんでした。棚に食材を少し足して、もう一度どうぞ');
+      return;
+    }
+    weekPlan = { days, buyAll: res.buyAll || [], madeAt: Date.now() };
+    LS.set('weekPlan', weekPlan);
+    renderRecipes();
+    fireMood('recipe-ready');
+  } catch (err) {
+    hideRecognizing();
+    fireMood('recipe-fail');
+    toast(String(err.message || err));
+  }
+}
+
+/* まとめ買いを買うものへ。すでに同じ名前が並んでいるものは足さない */
+$('#btn-week-to-shop').onclick = () => {
+  const buys = (weekPlan && weekPlan.buyAll) || [];
+  if (!buys.length) return;
+  const already = new Set(live(shop).map(s => s.name));
+  let added = 0;
+  buys.forEach(b => {
+    const name = String(b.name || '').trim();
+    if (!name || already.has(name)) return;
+    shop.push(newShopItem(name));
+    already.add(name);
+    added++;
+  });
+  if (!added) { toast('もう全部、買うものに入っています'); return; }
+  saveShop(); renderShop(); renderHome(); scheduleSync();
+  burst($('#btn-week-to-shop'), 14);
+  toast(`${added}品を買うものに入れました`);
+};
+
+$('#recipe-tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  recipeTab = b.dataset.rtab;
+  renderRecipes();
+});
 
 $('#recipe-list').addEventListener('click', e => {
   const card = e.target.closest('.recipe'); if (!card) return;

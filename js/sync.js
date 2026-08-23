@@ -132,6 +132,7 @@ async function sync() {
 const aiRecognize     = (dataUrl, shelfId) => post({ action: 'recognize', image: dataUrl, shelf: shelfId });
 const aiReadReceipt   = dataUrl => post({ action: 'recognize-receipt', image: dataUrl });
 const aiSuggestRecipes = payload => post(Object.assign({ action: 'suggest-recipes' }, payload));
+const aiPlanWeek       = payload => post(Object.assign({ action: 'plan-week' }, payload));
 
 /* 送る前に長辺1024pxまで縮める。Gemini に渡す量を減らすため */
 function shrinkImage(file, max = 1024, quality = 0.82) {

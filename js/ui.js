@@ -509,6 +509,8 @@ function renderChat() {
 
 /* ============ レシピ（機能G） ============ */
 let recipes = LS.get('recipes', []);
+let weekPlan = LS.get('weekPlan', null);   /* {days:[], buyAll:[], madeAt} */
+let recipeTab = 'today';
 
 /* 本家のレシピサイトへの検索リンク。
  * 中身（手順・写真・文章）は取り込まない。クックパッドは外部向けAPIを公開しておらず、
@@ -571,7 +573,75 @@ function renderFromFood() {
   }).join('');
 }
 
+/* ---- 1週間分 ---- */
+function renderWeek() {
+  const box = $('#week-days');
+  const buyBox = $('#week-buy');
+  const empty = $('#week-empty');
+
+  if (!weekPlan || !(weekPlan.days || []).length) {
+    box.innerHTML = ''; buyBox.hidden = true;
+    empty.hidden = false;
+    empty.innerHTML = settings.url
+      ? '「考えてもらう」を押すと、棚にあるものから1週間分を組み立てます。<br>期限が近いものを先に使う順番にします。'
+      : '共有URLを設定すると、1週間分を考えます。<br>（設定 &gt; 共有）';
+    return;
+  }
+  empty.hidden = true;
+
+  box.innerHTML = weekPlan.days.map(d => {
+    const plus = (d.buy || []).length > 0 || d.kind === 'plus';
+    return `<article class="recipe day" data-kind="${plus ? 'plus' : 'asis'}" data-day="${d.day}">
+      <div class="day-head">
+        <i class="day-n type-mono">${d.day}</i>
+        <div class="day-title">
+          <h3 class="recipe-title">${esc(d.title)}</h3>
+          <div class="chip-row tight">
+            ${[d.level, d.time].filter(Boolean).map(c => `<span class="chip is-flat">${esc(c)}</span>`).join('')}
+            ${plus ? '<span class="chip is-buy">買い足しあり</span>' : '<span class="chip is-have">あるもので</span>'}
+          </div>
+        </div>
+      </div>
+      ${d.note ? `<p class="recipe-note type-body-sm">${esc(d.note)}</p>` : ''}
+      ${(d.have || []).length ? `<div class="recipe-sec">
+        <div class="type-label muted">棚から使う</div>
+        <div class="chip-row tight">${d.have.map(n => `<span class="chip is-have"><img src="${charSrc(charForItem(n))}" alt="">${esc(n)}</span>`).join('')}</div>
+      </div>` : ''}
+      ${(d.buy || []).length ? `<div class="recipe-sec">
+        <div class="type-label muted">この日に足すもの</div>
+        <div class="chip-row tight">${d.buy.map(n => `<span class="chip is-buy">${esc(n)}</span>`).join('')}</div>
+      </div>` : ''}
+      <div class="recipe-sec">
+        <div class="type-label muted">本家のレシピを探す</div>
+        ${siteLinksHTML(recipeQuery(d), true)}
+      </div>
+    </article>`;
+  }).join('');
+
+  const buys = weekPlan.buyAll || [];
+  buyBox.hidden = buys.length === 0;
+  if (buys.length) {
+    $('#week-buy-n').textContent = buys.length + '品';
+    $('#week-buy-list').innerHTML = buys.map((b, i) => `<li data-i="${i}">
+      <span class="ba-name">${esc(b.name)}</span>
+      ${b.for ? `<span class="ba-for type-caption muted">${esc(b.for)}</span>` : ''}
+    </li>`).join('');
+  }
+}
+
 function renderRecipes() {
+  /* 「今日」と「1週間」は同じ画面の別の顔。出し分けはここ1か所で決める */
+  const week = recipeTab === 'week';
+  $$('#recipe-tabs button').forEach(b => b.classList.toggle('is-on', b.dataset.rtab === recipeTab));
+  syncSegPills($('#recipe-tabs'));
+  $('#recipe-head').textContent = week ? 'この1週間の夕飯' : '今日つくれそうなもの';
+  $('#btn-recipes').textContent = week ? '考えてもらう' : 'ほかにも';
+  $('#from-food').hidden = week;
+  $('#recipe-list').hidden = week;
+  $('#recipe-empty').hidden = week || $('#recipe-empty').hidden;
+  $('#week-plan').hidden = !week;
+  if (week) { renderWeek(); return; }
+
   renderFromFood();
   const box = $('#recipe-list');
   const empty = $('#recipe-empty');

@@ -95,6 +95,28 @@ console.log('\n▸ AI を叩けるのは実績のある家だけ（今回の穴�
   ok('Gemini を呼んでいない', ctx.__calls.gemini === 0);
 }
 
+console.log('\n▸ 1週間の献立（plan-week）');
+{
+  const week = { days: Array.from({length:7},(_,i)=>({day:i+1,title:'献立'+(i+1),kind:i<2?'asis':'plus',have:['たまご'],buy:i<2?[]:['豚こま切れ肉 200g']})),
+                 buyAll:[{name:'豚こま切れ肉 400g',for:'3日目・5日目'}] };
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiOut: week });
+  const r = post(ctx, { action: 'plan-week', house: EXISTING, have: [{name:'たまご',qty:6,unit:'個',daysLeft:5}] });
+  ok('7日ぶん返る', r.ok === true && r.days.length === 7, JSON.stringify(r).slice(0,120));
+  ok('まとめ買いの一覧も返る', Array.isArray(r.buyAll) && r.buyAll.length === 1);
+}
+{
+  const ctx = makeCtx({ rows: rowsFor(EXISTING) });
+  const r = post(ctx, { action: 'plan-week', house: 'zzzz-unknown-house', have: [] });
+  ok('でたらめなコードでは作らせない', r.ok === false && r.error.includes('この家族コードでは使えません'));
+  ok('Gemini を呼んでいない', ctx.__calls.gemini === 0);
+}
+{
+  const ctx = makeCtx({ rows: rowsFor(EXISTING) });
+  let last;
+  for (let i = 0; i < 61; i++) last = post(ctx, { action: 'plan-week', house: EXISTING, have: [] });
+  ok('1日の上限にも数えられる', last.ok === false && last.error.includes('今日はもうたくさん'));
+}
+
 console.log('\n▸ 1日の回数の上限');
 {
   const ctx = makeCtx({ rows: rowsFor(EXISTING) });
