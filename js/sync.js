@@ -6,7 +6,7 @@
  *  - 送った変更は、サーバーが弾いたぶんも必ず返してもらう（返さないと圏外の端末だけずれ続ける）
  */
 
-let syncing = false, syncAgain = false, syncTimer = null;
+let syncAgain = false, syncTimer = null, inFlight = null;
 let syncState = 'off', syncNote = '';
 
 function setSyncState(state, note = '') {
@@ -69,7 +69,11 @@ async function post(payload, timeoutMs = 60000) {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'サーバーがエラーを返しました');
+    if (!data.ok) {
+      const err = new Error(data.error || 'サーバーがエラーを返しました');
+      err.code = data.code || '';        // 文面ではなく印で見分けられるようにする
+      throw err;
+    }
     return data;
   } catch (err) {
     if (err.name === 'AbortError') throw new Error('時間がかかりすぎました');
@@ -79,10 +83,20 @@ async function post(payload, timeoutMs = 60000) {
   }
 }
 
-async function sync() {
-  if (!settings.url || !settings.house) { setSyncState('off'); return; }
-  if (syncing) { syncAgain = true; return; }
-  syncing = true; setSyncState('syncing');
+/* 呼び出し側が「合わせ終わったか」を待てるように、真偽を返す。
+ * すでに走っているときは、その1本に相乗りする（同じ内容を二重に送らない）。 */
+function sync() {
+  if (inFlight) { syncAgain = true; return inFlight; }
+  inFlight = runSync().finally(() => {
+    inFlight = null;
+    if (syncAgain) { syncAgain = false; scheduleSync(400); }
+  });
+  return inFlight;
+}
+
+async function runSync() {
+  if (!settings.url || !settings.house) { setSyncState('off'); return false; }
+  setSyncState('syncing');
 
   try {
     const pending = [];
@@ -118,21 +132,34 @@ async function sync() {
     saveAll();
     if (arrived) renderAll();
     setSyncState('ok');
+    return true;
   } catch (err) {
     setSyncState('error', !navigator.onLine ? 'オフラインです' : String(err.message || err));
-  } finally {
-    syncing = false;
-    if (syncAgain) { syncAgain = false; scheduleSync(400); }
+    return false;
   }
 }
 
 /* ============ AI への取り次ぎ ============
  * 画像も献立も、鍵を端末に置かずに済むよう GAS 経由で Gemini に渡す。
  */
-const aiRecognize     = (dataUrl, shelfId) => post({ action: 'recognize', image: dataUrl, shelf: shelfId });
-const aiReadReceipt   = dataUrl => post({ action: 'recognize-receipt', image: dataUrl });
-const aiSuggestRecipes = payload => post(Object.assign({ action: 'suggest-recipes' }, payload));
-const aiPlanWeek       = payload => post(Object.assign({ action: 'plan-week' }, payload));
+/* サーバーは「一度でも合わせに来た家」にしか AI を通さない。
+ * 家族コードを作った直後は、その1回目がまだ届いていないことがある
+ * （棚が空のうちは送るものが無いので、なおさら遅れる）。
+ * 断られたら、その場で合わせてから、もう一度だけ頼む。 */
+async function postAI(payload) {
+  try {
+    return await post(payload);
+  } catch (err) {
+    if (err.code !== 'unknown-house') throw err;
+    if (!await sync()) throw err;
+    return post(payload);
+  }
+}
+
+const aiRecognize     = (dataUrl, shelfId) => postAI({ action: 'recognize', image: dataUrl, shelf: shelfId });
+const aiReadReceipt   = dataUrl => postAI({ action: 'recognize-receipt', image: dataUrl });
+const aiSuggestRecipes = payload => postAI(Object.assign({ action: 'suggest-recipes' }, payload));
+const aiPlanWeek       = payload => postAI(Object.assign({ action: 'plan-week' }, payload));
 
 /* 送る前に長辺1024pxまで縮める。Gemini に渡す量を減らすため */
 function shrinkImage(file, max = 1024, quality = 0.82) {
