@@ -864,3 +864,17 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 .from-food-row .tag { flex: none; }
 .from-food-row .chip-row { margin-left: auto; flex: none; flex-wrap: nowrap; gap: 4px; }
 .chip.is-link.sm { padding: 5px 9px; font-size: 11px; }
+
+
+/* 設定の「ふだんは触らない」ところ */
+.fold { margin-top: var(--s-5); }
+.fold > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  color: var(--fg-3);
+  font-size: 13px;
+  list-style: none;
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::before { content: "＋ "; }
+.fold[open] > summary::before { content: "− "; }

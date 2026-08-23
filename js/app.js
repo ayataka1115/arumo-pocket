@@ -737,8 +737,6 @@ function renderSettings() {
 
   } else if (setTab === 'share') {
     body.innerHTML = `
-      <label class="field-label">共有URL</label>
-      <input id="s-url" type="url" class="field" value="${esc(settings.url)}" placeholder="https://script.google.com/.../exec" inputmode="url" autocomplete="off">
       <label class="field-label">家族コード</label>
       <div class="row-tight">
         <input id="s-house" type="text" class="field" value="${esc(settings.house)}" placeholder="家族コード" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -746,7 +744,18 @@ function renderSettings() {
       </div>
       <p id="sync-detail" class="hint type-caption"></p>
       <button id="s-sync-now" class="btn-ghost wide">いますぐ合わせる</button>
-      <p class="hint type-caption">共有URLと家族コードが同じ端末どうしが、同じ棚・同じ買い物リストになります。<strong>家族コードは合言葉です。</strong>推測されにくいものにしてください。写真の読み取りとレシピもこのURL経由で動きます。</p>`;
+      <p class="hint type-caption"><strong>家族コードが同じ端末どうしが、同じ棚・同じ買い物リストになります。</strong>これは合言葉なので、家族以外には教えないでください。</p>
+
+      <label class="field-label">家族を呼ぶ</label>
+      <button id="s-invite" class="btn-ghost wide">招待リンクを送る</button>
+      <p class="hint type-caption">このリンクを開いた端末は、<strong>家族コードを打たずにそのまま仲間に入れます。</strong>合言葉が入ったリンクなので、家族にだけ送ってください。</p>
+
+      <details class="fold">
+        <summary>つなぎ先を変える（ふだんは触らない）</summary>
+        <label class="field-label">共有URL</label>
+        <input id="s-url" type="url" class="field" value="${esc(settings.url)}" placeholder="https://script.google.com/.../exec" inputmode="url" autocomplete="off">
+        <p class="hint type-caption">写真の読み取りとレシピもここを通ります。最初から入っているので、ふつうは変更不要です。</p>
+      </details>`;
     setSyncState(syncState, syncNote);
 
   } else if (setTab === 'data') {
@@ -860,10 +869,17 @@ $('#set-body').addEventListener('click', e => {
   if (b.dataset.timing) { settings.notifTiming = b.dataset.timing; saveSettings(); renderSettings(); return; }
 
   /* 共有 */
+  if (b.id === 's-invite') {
+    if (!settings.house) { toast('先に家族コードを決めてください'); return; }
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    shareText(`アルノポケットに招待します。\nこのリンクを開くと、そのまま同じ棚が見られます。\n\n${base}#join=${encodeURIComponent(settings.house)}`);
+    return;
+  }
   if (b.id === 's-house-make') {
     const abc = 'abcdefghjkmnpqrstuvwxyz23456789';   // 読み間違えにくい文字だけ
     let code = '';
-    for (let i = 0; i < 10; i++) code += abc[Math.floor(Math.random() * abc.length)];
+    /* サーバー側が新しい家に12文字以上を求めるので、それより長くする */
+    for (let i = 0; i < 14; i++) code += abc[Math.floor(Math.random() * abc.length)];
     setShare({ house: code });
     renderSettings();
     toast('家族コードを作りました。家族にも同じものを入れてもらってください');
@@ -1021,6 +1037,22 @@ live(items).forEach(i => pendingEnter.add(i.id));
 renderAll();
 renderRecipes();
 setView('home');
+/* 招待リンク（#join=合言葉）で開かれたとき。
+ * 家族は何も打たずに仲間に入れる。すでに別の家に入っている端末では、
+ * 黙って乗り換えると手元の品目が別の家に混ざるので、必ず確かめる。 */
+(function joinFromLink() {
+  const m = location.hash.match(/[#&]join=([^&]+)/);
+  if (!m) return;
+  let code = '';
+  try { code = decodeURIComponent(m[1]).trim(); } catch { return; }
+  history.replaceState(null, '', location.pathname + location.search);   // リンクを履歴に残さない
+  if (!code || code === settings.house) return;
+  if (settings.house && !confirm(`いまの家族（${settings.house}）から、こちらに乗り換えますか。\n\n${code}\n\n手元の棚の中身は、乗り換えた先に合流します。`)) return;
+  setShare({ house: code });
+  renderAll();
+  toast('家族に加わりました');
+})();
+
 setSyncState(settings.url && settings.house ? 'syncing' : 'off');
 saveAll();
 scheduleSync(300);

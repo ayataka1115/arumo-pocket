@@ -35,6 +35,10 @@ const SHELF_ICON_NAMES = {
   books:'本棚', tools:'DIY工具', car:'車のトランク', baby:'ベビー', toy:'おもちゃ',
   pet:'ペット', plant:'園芸', hobby:'趣味', custom:'自由な棚',
 };
+/* 家族共有の取り次ぎ先（Apps Script）。表そのものではなく、表を読み書きする窓口。 */
+const DEFAULT_SHARE_URL =
+  'https://script.google.com/macros/s/AKfycbwDVsdUyGb4bG0VaGzlwrKssHovdPyoDRQdtCGiHc_8MWeglRGFjD5bL2Fm2VhtF4kNOw/exec';
+
 const SHELF_COLORS = ['fridge','freezer','pantry','daily','tool','custom'];
 
 /* 最初に用意しておく6棚。名前もアイコンも設定から変えられる */
@@ -201,7 +205,11 @@ let chat  = prune(migrate(LS.get('chat', [])));
 const DEFAULT_SETTINGS = {
   me: LS.get('me', '') || '',
   houseName: 'わが家',
-  url: '', house: '',
+  /* 共有URL は合言葉ではないので、最初から入れておく。
+   * 家族が新しい端末で使い始めるとき、100文字近いこのURLを打ち直すのは無理がある。
+   * 中身を守っているのは家族コードのほう。サーバー側でも
+   * 「実績のある家だけ・1日60回まで」に制限してある。 */
+  url: DEFAULT_SHARE_URL, house: '',
   members: [],
   shelves: DEFAULT_SHELVES.map(s => Object.assign({}, s)),
   heroChar: 'heart',   heroCharMode: 'auto',   heroCharName: '',
@@ -213,6 +221,7 @@ const DEFAULT_SETTINGS = {
 };
 
 let settings = Object.assign({}, DEFAULT_SETTINGS, LS.get('settings', {}));
+if (!settings.url) settings.url = DEFAULT_SHARE_URL;   /* 空で保存されていた端末にも入れる */
 settings.shelves = (settings.shelves && settings.shelves.length ? settings.shelves : DEFAULT_SHELVES)
   .map(s => Object.assign({ mode: 'qty', color: 'custom', icon: 'custom' }, s));
 /* 旧バージョンの設定からの引き取り */
