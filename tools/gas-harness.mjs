@@ -30,7 +30,7 @@ function makeSheet(rows = [], cols = 14) {
 }
 
 function makeCtx({ rows = [], houses = null, geminiOut = { recipes: [{ title: 'てすと' }] }, today = '20260823',
-                   geminiCodes = null, geminiBadKey = false } = {}) {
+                   geminiCodes = null, geminiBadKey = false, geminiMsg = '' } = {}) {
   const props = new Map();
   const cache = new Map();
   const calls = { gemini: 0, models: [] };
@@ -68,7 +68,7 @@ function makeCtx({ rows = [], houses = null, geminiOut = { recipes: [{ title: '�
         getResponseCode: () => code,
         getContentText: () => (code === 200
           ? JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(geminiOut) }] } }] })
-          : JSON.stringify({ error: { message: 'models/' + model + ' is not found' } })),
+          : JSON.stringify({ error: { message: geminiMsg || ('models/' + model + ' is not found') } })),
       };
     } },
     ContentService: { createTextOutput: (t) => ({ setMimeType: () => ({ __text: t }) }), MimeType: { JSON: 'json' } },
@@ -334,6 +334,33 @@ console.log('\n▸ 無料の鍵で有料モデルを引いても、下りて答�
   const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
   ok('鍵が違うと伝える', r.ok === false && r.error.includes('GEMINI_API_KEY'), JSON.stringify(r));
   ok('1回しか呼んでいない', ctx.__calls.gemini === 1, 'calls=' + ctx.__calls.gemini);
+}
+{
+  /* 壊れた写真を送られたとき（400）に、モデルを休ませてしまわないこと。
+   * 休ませると、その1枚のせいで上のモデルが家族ぜんぶに対して止まる。 */
+  const ctx = makeCtx({ rows: rowsFor(EXISTING),
+                        geminiCodes: { 'gemini-3.7-flash': 400, 'gemini-3.6-flash': 400,
+                                       'gemini-3.5-flash': 400, 'gemini-3.1-flash-lite': 400,
+                                       'gemini-2.5-flash': 400, 'gemini-2.5-flash-lite': 400 },
+                        geminiMsg: 'Invalid value at \'inline_data.data\' (TYPE_BYTES), Base64 decoding failed' });
+  const r = post(ctx, { action: 'recognize', house: EXISTING, image: 'data:image/jpeg;base64,zzz' });
+  ok('送った中身が悪いときは、その理由をそのまま返す',
+     r.ok === false && r.error.includes('Base64'), JSON.stringify(r));
+  ok('1回で止める（下りない）', ctx.__calls.gemini === 1, 'calls=' + ctx.__calls.gemini);
+  ok('モデルを休ませていない', ctx.__cache.get('rest:gemini-3.7-flash') === undefined);
+  // 直後にまともな写真が来たら、上のモデルで普通に通ること
+  const ctx2 = makeCtx({ rows: rowsFor(EXISTING) });
+  ok('別の頼みは上のモデルで通る',
+     post(ctx2, { action: 'recognize', house: EXISTING, image: 'data:image/jpeg;base64,AAA' }).ok === true);
+}
+{
+  // モデルの名前を咎めている 400 なら、モデルのせいとみなして下りる
+  const ctx = makeCtx({ rows: rowsFor(EXISTING), geminiCodes: { 'gemini-3.7-flash': 400 },
+                        geminiMsg: 'models/gemini-3.7-flash is not supported for this API version' });
+  const r = post(ctx, { action: 'suggest-recipes', house: EXISTING, have: [] });
+  ok('モデルを咎める 400 なら次へ下りる', r.ok === true, JSON.stringify(r).slice(0, 120));
+  ok('2つ目で当たっている',
+     ctx.__calls.models.join(',') === 'gemini-3.7-flash,gemini-3.6-flash', ctx.__calls.models.join(','));
 }
 {
   // 候補そのものをスクリプト プロパティで差し替えられる
