@@ -1,0 +1,30 @@
+:root {
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  line-height: 1.8;
+  --ink: #161616;
+  --muted: #666;
+  --surface: #f4f4f4;
+  --line: #d2d2d2;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: #fff; }
+header, main, footer { width: min(720px, calc(100% - 40px)); margin-inline: auto; }
+header { padding: 64px 0 28px; border-bottom: 1px solid var(--line); }
+main { padding: 8px 0 64px; }
+footer { padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+h1 { margin: 0 0 10px; font-size: clamp(2.4rem, 8vw, 4.4rem); letter-spacing: .08em; }
+h2 { margin-top: 2.4rem; font-size: 1.3rem; }
+p, li { max-width: 66ch; }
+a { color: inherit; text-underline-offset: .22em; }
+.eyebrow { margin: 0 0 8px; color: var(--muted); font-weight: 700; }
+.lead { font-size: 1.16rem; }
+.card { margin: 28px 0; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.nav { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 28px; }
+.updated { color: var(--muted); font-size: .9rem; }
+
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #f3f3f3; --muted: #aaa; --surface: #202020; --line: #444; }
+  body { background: #101010; }
+}
